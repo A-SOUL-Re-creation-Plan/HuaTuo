@@ -4,52 +4,71 @@ using System.Text.Json.Nodes;
 
 namespace Feishu.Message
 {
-    // 所有发送内容的通用接口，包括消息的类型和消息的内容
+    /// <summary>
+    /// 发送内容的接口
+    /// </summary>
     public interface IMessageContent
     {
         public string ContentType { get; }
         public string Content { get; }
     }
 
-    // 实现发送内容接口——文本类型消息
+    /// <summary>
+    /// 构造一条纯文本消息
+    /// </summary>
     public sealed class TextContent : IMessageContent
     {
-        public string ContentType { get { return "text"; } }
+        public string ContentType { get => "text"; }
         public string Text { get; set; } = "";
         public string Content { get { return JsonSerializer.Serialize(new { text = Text }); } }
 
         public TextContent() { }
         public TextContent(string text) { Text = text; }
     }
-    // 实现接口——表情
+
+    /// <summary>
+    /// 构造一条表情消息
+    /// </summary>
     public sealed class StickerContent : IMessageContent
     {
-        public string ContentType { get { return "sticker"; } }
+        public string ContentType { get => "sticker"; }
         public string File_key { get; set; } = "";
         public string Content { get { return JsonSerializer.Serialize(new { file_key = File_key }); } }
 
         public StickerContent() { }
         public StickerContent(string file_key) { File_key = file_key; }
     }
-    // 实现接口——图片
+
+
+    /// <summary>
+    /// 构造一条图片消息
+    /// </summary>
     public sealed class ImageContent : IMessageContent
     {
-        public string ContentType { get { return "image"; } }
+        public string ContentType { get => "image"; }
         public string Image_key { get; set; } = "";
         public string Content { get { return JsonSerializer.Serialize(new { image_key = Image_key }); } }
 
         public ImageContent() { }
         public ImageContent(string image_key) { Image_key = image_key; }
     }
-    // 富文本
-    public enum FeishuPostEmotion
+
+
+    /// <summary>
+    /// 飞书表情
+    /// </summary>
+    public enum FeishuMessageEmotion
     {
         OK,
         THUMBSUP
     }
+
+    /// <summary>
+    /// 构造一条富文本
+    /// </summary>
     public sealed class PostContent : IMessageContent
     {
-        public string ContentType { get { return "post"; } }
+        public string ContentType { get => "post"; }
         public string Content
         {
             get
@@ -65,13 +84,25 @@ namespace Feishu.Message
             }
         }
 
+        /// <summary>
+        /// 向富文本中添加一段内容
+        /// </summary>
+        /// <param name="element_list">元素列表</param>
         public void Add(List<object> element_list) => this.content.Add(element_list);
 
         private string? title;
         private readonly List<List<object>> content = new List<List<object>>();
 
+        /// <summary>
+        /// 为富文本添加标题
+        /// </summary>
+        /// <param name="title">标题内容</param>
         public void SetTitle(string title) => this.title = title;
 
+        /// <summary>
+        /// 向富文本中添加一段内容
+        /// </summary>
+        /// <param name="element_list">元素列表</param>
         public void NewParagraph(List<object> element_list) => this.content.Add(element_list);
 
         public object NewText(string text) => new { tag = "text", text };
@@ -87,13 +118,16 @@ namespace Feishu.Message
 
         public void NewImgParagraph(string image_key) => NewParagraph(new List<object> { new { tag = "img", image_key } });
 
-        public object NewEmotion(FeishuPostEmotion emoji) => new { tag = "emotion", emoji_type = Enum.GetName(emoji) };
+        public object NewEmotion(FeishuMessageEmotion emoji) => new { tag = "emotion", emoji_type = Enum.GetName(emoji) };
 
     }
-    // 消息卡片
+
+    /// <summary>
+    /// 构造一条消息卡片
+    /// </summary>
     public sealed class InteractiveContent : IMessageContent
     {
-        public string ContentType { get { return "interactive"; } }
+        public string ContentType { get => "interactive"; }
         public string Content { get { return JsonSerializer.Serialize(_content); } }
 
         private object _content;
@@ -107,7 +141,11 @@ namespace Feishu.Message
             _content = new { type = "template", data = new { template_id, template_variable } };
         }
     }
-    // 消息请求主体
+
+
+    /// <summary>
+    /// 消息管理主体
+    /// </summary>
     public class MessageRequest
     {
         private static readonly Uri _base_uri = new("https://open.feishu.cn/open-apis/im/v1/messages/");
@@ -116,11 +154,27 @@ namespace Feishu.Message
 
         public MessageRequest(BotApp app)
         {
-            _client = new RestClient(_base_uri);
+            this._client = new RestClient(_base_uri);
             this.app = app;
         }
 
-        public async Task<Response.MessageSendResponse> SendRequest(IMessageContent content, LarkID receive_id, string? uuid = null)
+        public MessageRequest(BotApp app, RestClient client)
+        {
+            this._client = client;
+            this.app = app;
+        }
+
+        /// <summary>
+        /// 发送一条消息
+        /// </summary>
+        /// <param name="content">消息内容</param>
+        /// <param name="receive_id">接收者</param>
+        /// <param name="uuid">去重id，可选</param>
+        /// <returns>响应体实例</returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task<Response.MessageSendResponse> SendMessage(IMessageContent content, LarkID receive_id, string? uuid = null)
         {
             // 获取Token
             var token = app.RefreashToken();

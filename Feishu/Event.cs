@@ -3,6 +3,9 @@ using System.Text;
 
 namespace Feishu.Event
 {
+    /// <summary>
+    /// 事件回调类的基类，继承自该类，实现EventCallback方法
+    /// </summary>
     public abstract class FeishuEventHandler
     {
         protected readonly BotApp botApp;
@@ -12,6 +15,10 @@ namespace Feishu.Event
         public abstract void EventCallback(string json_content);
     }
 
+    /// <summary>
+    /// 事件管理类
+    /// 后续开发希望抽象到每个BotApp实例上，而是静态类
+    /// </summary>
     public static class EventManager
     {
         private static readonly Dictionary<string, Type> handler_map = new();
@@ -44,7 +51,10 @@ namespace Feishu.Event
         }
     }
 
-
+    /// <summary>
+    /// 构造一个事件体
+    /// </summary>
+    /// <typeparam name="T">事件主体，若不确定则使用object</typeparam>
     public record EventContent<T> where T : class
     {
         public required string Schema { get; set; }
@@ -52,6 +62,9 @@ namespace Feishu.Event
         public required T Event { get; set; }
     }
 
+    /// <summary>
+    /// 事件头
+    /// </summary>
     public record Header
     {
         public required string Event_id { get; set; }

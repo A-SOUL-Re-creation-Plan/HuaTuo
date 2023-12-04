@@ -1,12 +1,9 @@
-using Nett;
-using System.Text.Json.Nodes;
-using Feishu.Event;
-using System.Text.Json;
 using Feishu;
+using Feishu.Event;
 using Feishu.Serve;
-
-// 在这里加了一行注释 —— integralAva
-// 添加注释 —— Joyfish
+using Nett;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace HuaTuo
 {
@@ -23,20 +20,21 @@ namespace HuaTuo
             }
             else
             {
-                    var toml_file = Toml.ReadFile(args[0]);
-                    var feishu_table = toml_file.Get<TomlTable>("feishu");
-                    var config_table = toml_file.Get<TomlTable>("config");
+                var toml_file = Toml.ReadFile(args[0]);
+                var feishu_table = toml_file.Get<TomlTable>("feishu");
+                var config_table = toml_file.Get<TomlTable>("config");
 
-                    app_id = feishu_table.Get<string>("app_id");
-                    app_secret = feishu_table.Get<string>("app_secret");
-                    verification_token = feishu_table.Get<string>("Verification_Token");
-                    encrypt_key = feishu_table.Get<string>("Encrypt_Key");
+                app_id = feishu_table.Get<string>("app_id");
+                app_secret = feishu_table.Get<string>("app_secret");
+                verification_token = feishu_table.Get<string>("Verification_Token");
+                encrypt_key = feishu_table.Get<string>("Encrypt_Key");
             }
 
             /*
              * 在此处注册回调函数
              */
             BotApp botApp = new BotApp(app_id, app_secret);
+            // 消息事件
             EventManager.RegisterHandlerClass<MessageReceiveHandler>("im.message.receive_v1");
 
             var app = WebApplication.Create();
@@ -55,7 +53,7 @@ namespace HuaTuo
                     httpContext.Request.EnableBuffering();
                     string request_body;
                     // 初始化一个异步的流读取器
-                    using (var stream_reader =  new StreamReader(httpContext.Request.Body))
+                    using (var stream_reader = new StreamReader(httpContext.Request.Body))
                     {
                         request_body = await stream_reader.ReadToEndAsync();
                     }
@@ -63,7 +61,7 @@ namespace HuaTuo
                     // 第一步读数据，此时被加密，进行解密后parse
                     var content = EventManager.DecryptData(encrypt_key, JsonNode.Parse(request_body)!["encrypt"]!.ToString());
                     var json_data = JsonNode.Parse(content);
-                    
+
                     // 是否是HTTP测试事件？
                     if (json_data!["type"] != null)
                     {
@@ -71,7 +69,7 @@ namespace HuaTuo
                         if (json_data!["type"]!.ToString() == "url_verification") return Results.BadRequest();
                         // 验证 Verification Token
                         if (json_data!["token"]!.ToString() != verification_token) return Results.BadRequest();
-                        return Results.Ok(new {challenge = json_data!["challenge"]!.ToString() });
+                        return Results.Ok(new { challenge = json_data!["challenge"]!.ToString() });
                     }
 
                     // 是否是v2事件？
@@ -86,9 +84,9 @@ namespace HuaTuo
                     Type? event_handler = EventManager.GetHandlerWithType(event_content.Header.Event_type);
                     if (event_handler != null)
                     {
-                        var handler = (FeishuEventHandler)Activator.CreateInstance(event_handler, botApp )!;
+                        var handler = (FeishuEventHandler)Activator.CreateInstance(event_handler, botApp)!;
                         new Thread(() => handler.EventCallback(content)).Start();
-                    } 
+                    }
 
                     return Results.Ok();
                 }

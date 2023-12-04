@@ -75,6 +75,12 @@ namespace Feishu
 
         public static JsonSerializerOptions JsonOption { get => json_option; }
 
+        /// <summary>
+        /// 确认正常响应，尝试提取信息
+        /// </summary>
+        /// <param name="resp">响应体</param>
+        /// <exception cref="HttpRequestException">Http请求时发生错误</exception>
+        /// <exception cref="FeishuException">请求成功，但飞书端抛出错误</exception>
         public static void EnsureSuccessful(RestResponse resp)
         {
             // 未完成响应
@@ -85,8 +91,8 @@ namespace Feishu
             }
             else if (!resp.IsSuccessful)
             {
-                FeishuErrorResponse errorResponse = JsonSerializer.Deserialize<FeishuErrorResponse>(resp.RawBytes)
-                    ?? throw new HttpRequestException(resp.StatusDescription, null, resp.StatusCode); ;
+                FeishuErrorResponse errorResponse = JsonSerializer.Deserialize<FeishuErrorResponse>(resp.RawBytes, JsonOption)
+                    ?? throw new HttpRequestException(resp.StatusDescription, null, resp.StatusCode);
                 throw new FeishuException(errorResponse);
             }
         }
