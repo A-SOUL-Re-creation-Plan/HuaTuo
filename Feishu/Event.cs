@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Feishu.Event
 {
@@ -10,6 +11,9 @@ namespace Feishu.Event
     {
         protected readonly BotApp botApp;
 
+        protected EventContent<T> DeserializeData<T>(string json_content) where T : class =>
+            JsonSerializer.Deserialize<EventContent<T>>(json_content, HttpTools.JsonOption)!;
+
         public FeishuEventHandler(BotApp botApp) => this.botApp = botApp;
 
         public abstract void EventCallback(string json_content);
@@ -17,14 +21,24 @@ namespace Feishu.Event
 
     /// <summary>
     /// 事件管理类
-    /// 后续开发希望抽象到每个BotApp实例上，而是静态类
+    /// 后续开发希望抽象到每个BotApp实例上，而不是静态类
     /// </summary>
     public static class EventManager
     {
         private static readonly Dictionary<string, Type> handler_map = new();
 
+        /// <summary>
+        /// 注册事件服务类·
+        /// </summary>
+        /// <typeparam name="T">要注册的类</typeparam>
+        /// <param name="event_type">事件类型</param>
         public static void RegisterHandlerClass<T>(string event_type) where T : FeishuEventHandler => handler_map.Add(event_type, typeof(T));
 
+        /// <summary>
+        /// 获取一个事件类
+        /// </summary>
+        /// <param name="event_type">事件类名</param>
+        /// <returns>Type or null</returns>
         public static Type? GetHandlerWithType(string event_type)
         {
             bool success = handler_map.TryGetValue(event_type, out var handler);

@@ -11,33 +11,20 @@ namespace HuaTuo
     {
         public static void Main(string[] args)
         {
-            string app_id = "", app_secret = "", verification_token = "", encrypt_key = "";
+            HuaTuoConfigFile cConfigFile;
 
-            if (args.Length == 0)
-            {
-                Console.WriteLine("需要配置文件 toml");
-                Environment.Exit(0);
-            }
-            else
-            {
-                var toml_file = Toml.ReadFile(args[0]);
-                var feishu_table = toml_file.Get<TomlTable>("feishu");
-                var config_table = toml_file.Get<TomlTable>("config");
+            // 加载config文件
+            if (args.Length == 0) { Console.WriteLine("需要配置文件"); return; }
+            else cConfigFile = Toml.ReadFile<HuaTuoConfigFile>(args[0]);
 
-                app_id = feishu_table.Get<string>("app_id");
-                app_secret = feishu_table.Get<string>("app_secret");
-                verification_token = feishu_table.Get<string>("Verification_Token");
-                encrypt_key = feishu_table.Get<string>("Encrypt_Key");
-            }
+            var app = WebApplication.Create();
 
-            /*
-             * 在此处注册回调函数
-             */
-            BotApp botApp = new BotApp(app_id, app_secret);
+            // 注册BotApp
+            BotApp botApp = new BotApp(cConfigFile, app.Logger);
+
             // 消息事件
             EventManager.RegisterHandlerClass<MessageReceiveHandler>("im.message.receive_v1");
 
-            var app = WebApplication.Create();
 
             app.MapPost("/", async (HttpContext httpContext) =>
             {
@@ -51,41 +38,39 @@ namespace HuaTuo
                      * File 重写了读取方法，允许使用同步操作
                      */
                     httpContext.Request.EnableBuffering();
-                    string request_body;
+                    string sRequestBody;
                     // 初始化一个异步的流读取器
                     using (var stream_reader = new StreamReader(httpContext.Request.Body))
                     {
-                        request_body = await stream_reader.ReadToEndAsync();
+                        sRequestBody = await stream_reader.ReadToEndAsync();
                     }
 
                     // 第一步读数据，此时被加密，进行解密后parse
-                    var content = EventManager.DecryptData(encrypt_key, JsonNode.Parse(request_body)!["encrypt"]!.ToString());
-                    var json_data = JsonNode.Parse(content);
+                    sRequestBody = EventManager.DecryptData(cConfigFile.Feishu.Encrypt_Key, JsonNode.Parse(sRequestBody)!["encrypt"]!.ToString());
+                    JsonNode nJsonData = JsonNode.Parse(sRequestBody)!;
 
                     // 是否是HTTP测试事件？
-                    if (json_data!["type"] != null)
+                    if (nJsonData["type"] != null)
                     {
                         // HTTP 验证，返回challenge
-                        if (json_data!["type"]!.ToString() == "url_verification") return Results.BadRequest();
+                        if (nJsonData["type"]!.ToString() == "url_verification") return Results.BadRequest();
                         // 验证 Verification Token
-                        if (json_data!["token"]!.ToString() != verification_token) return Results.BadRequest();
-                        return Results.Ok(new { challenge = json_data!["challenge"]!.ToString() });
+                        if (nJsonData["token"]!.ToString() != cConfigFile.Feishu.Verification_Token) return Results.BadRequest();
+                        return Results.Ok(new { challenge = nJsonData["challenge"]!.ToString() });
                     }
 
                     // 是否是v2事件？
-                    if (json_data!["schema"] == null) return Results.BadRequest();
+                    if (nJsonData["schema"] == null) return Results.BadRequest();
 
-                    // 反序列化为Event Content
-                    EventContent<object> event_content = JsonSerializer.Deserialize<EventContent<object>>(content, HttpTools.JsonOption)!;
                     // 验证 Verification Token
-                    if (event_content.Header.Token != verification_token) return Results.BadRequest();
+                    if (nJsonData["header"]!["token"]!.ToString() != cConfigFile.Feishu.Verification_Token) return Results.BadRequest();
 
                     // 寻找回调类
-                    Type? event_handler = EventManager.GetHandlerWithType(event_content.Header.Event_type);
+                    Type? event_handler = EventManager.GetHandlerWithType(nJsonData["header"]!["event_type"]!.ToString());
                     if (event_handler != null)
                     {
                         var handler = (FeishuEventHandler)Activator.CreateInstance(event_handler, botApp)!;
-                        new Thread(() => handler.EventCallback(content)).Start();
+                        new Thread(() => handler.EventCallback(sRequestBody)).Start();
                     }
 
                     return Results.Ok();
@@ -94,6 +79,34 @@ namespace HuaTuo
             });
 
             app.Run("http://localhost:3000");
+        }
+
+        /// <summary>
+        /// 配置文件基类
+        /// </summary>
+        public record HuaTuoConfigFile
+        {
+            public required HuaTuoConfigFileFeishu Feishu { get; set; }
+            public required HuaTuoConfigFileConfig Config { get; set; }
+        }
+
+        /// <summary>
+        /// 配置文件中的Feishu表
+        /// </summary>
+        public record HuaTuoConfigFileFeishu
+        {
+            public required string App_id { get; set; }
+            public required string App_secret { get; set; }
+            public required string Verification_Token { get; set; }
+            public required string Encrypt_Key { get; set; }
+        }
+
+        public record HuaTuoConfigFileConfig
+        {
+            public required string Debug_group { get; set; }
+            public required string Bot_Open_id { get; set; }
+            public required string[] JiHua_Serve {  get; set; }
+            public required string[] Debug_Serve { get; set; }
         }
     }
 }

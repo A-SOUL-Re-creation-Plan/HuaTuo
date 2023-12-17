@@ -68,6 +68,9 @@ namespace Feishu.Message
     /// </summary>
     public sealed class PostContent : IMessageContent
     {
+        private string? title;
+        private readonly List<List<object>> content = new List<List<object>>();
+
         public string ContentType { get => "post"; }
         public string Content
         {
@@ -89,9 +92,6 @@ namespace Feishu.Message
         /// </summary>
         /// <param name="element_list">元素列表</param>
         public void Add(List<object> element_list) => this.content.Add(element_list);
-
-        private string? title;
-        private readonly List<List<object>> content = new List<List<object>>();
 
         /// <summary>
         /// 为富文本添加标题
@@ -152,12 +152,6 @@ namespace Feishu.Message
         private readonly RestClient _client;
         private readonly BotApp app;
 
-        public MessageRequest(BotApp app)
-        {
-            this._client = new RestClient(_base_uri);
-            this.app = app;
-        }
-
         public MessageRequest(BotApp app, RestClient client)
         {
             this._client = client;
@@ -179,7 +173,7 @@ namespace Feishu.Message
             // 获取Token
             var token = app.RefreashToken();
             // 构建请求体
-            var request = new RestRequest();
+            var request = new RestRequest(_base_uri);
             request.AddQueryParameter("receive_id_type", receive_id.id_type);
             request.AddBody(new
             {
@@ -200,10 +194,18 @@ namespace Feishu.Message
                 throw new Exception("Deserialize Failed");
         }
 
+        /// <summary>
+        /// 获取消息内容
+        /// </summary>
+        /// <param name="message_id">消息ID</param>
+        /// <returns>消息响应体</returns>
+        /// <exception cref="Exception">反序列化发生错误</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageGetResponse> GetMessage(string message_id)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{message_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
@@ -214,10 +216,20 @@ namespace Feishu.Message
                 throw new Exception("Deserialize Failed");
         }
 
+        /// <summary>
+        /// 回复一条消息
+        /// </summary>
+        /// <param name="content">消息内容</param>
+        /// <param name="message_id">消息ID</param>
+        /// <param name="uuid">可选唯一UUID</param>
+        /// <returns>响应体</returns>
+        /// <exception cref="Exception">反序列化发生错误</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageSendResponse> ReplyMessage(IMessageContent content, string message_id, string? uuid = null)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{message_id}/reply");
+            var request = new RestRequest($"{_base_uri.OriginalString}{message_id}/reply");
 
             request.AddBody(new
             {
@@ -235,10 +247,17 @@ namespace Feishu.Message
                 throw new Exception("Deserialize Failed");
         }
 
+        /// <summary>
+        /// 撤回一条消息
+        /// </summary>
+        /// <param name="message_id">消息ID</param>
+        /// <returns>None</returns>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task DeleteMessage(string message_id)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{message_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
@@ -247,10 +266,19 @@ namespace Feishu.Message
             HttpTools.EnsureSuccessful(resp);
         }
 
+        /// <summary>
+        /// 编辑一条消息
+        /// </summary>
+        /// <param name="content">编辑后内容</param>
+        /// <param name="message_id">消息ID</param>
+        /// <returns>消息响应体</returns>
+        /// <exception cref="Exception">发生错误</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageSendResponse> EditMessage(IMessageContent content, string message_id)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{message_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             request.AddBody(new
             {
@@ -267,11 +295,18 @@ namespace Feishu.Message
                 throw new Exception("Deserialize Failed");
         }
 
+        /// <summary>
+        /// 从消息中下载资源
+        /// </summary>
+        /// <param name="message_id">消息ID</param>
+        /// <param name="file_key">资源ID</param>
+        /// <returns>资源代表的流</returns>
+        /// <exception cref="Exception">发错错误</exception>
         public async Task<byte[]> DownloadFromMessage(string message_id, string file_key)
         {
             var token = app.RefreashToken();
             var stream_type = file_key.StartsWith("img") ? "image" : "file";
-            var request = new RestRequest($"{message_id}/resources/{file_key}?type={stream_type}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{message_id}/resources/{file_key}?type={stream_type}");
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
 
@@ -279,6 +314,12 @@ namespace Feishu.Message
             return resp.RawBytes ?? throw new Exception("流读取失败");
         }
 
+        /// <summary>
+        /// 上传图片
+        /// </summary>
+        /// <param name="img_stream">图片流</param>
+        /// <returns>图片代表的file_key</returns>
+        /// <exception cref="Exception">发生错误时</exception>
         public async Task<string> UploadImage(Stream img_stream)
         {
             var token = app.RefreashToken();
@@ -303,7 +344,7 @@ namespace Feishu.Message
 namespace Feishu.Message.Response
 {
     // 发送消息响应体
-    public class MessageSendResponse
+    public record MessageSendResponse
     {
         public required int Code { get; set; }
         public required string Msg { get; set; }
@@ -311,7 +352,7 @@ namespace Feishu.Message.Response
     }
 
     // 查询消息响应体
-    public class MessageGetResponse
+    public record MessageGetResponse
     {
         public required int Code { get; set; }
         public required string Msg { get; set; }
@@ -319,7 +360,7 @@ namespace Feishu.Message.Response
     }
 
     // 以下为反序列用的类
-    public class MessageData
+    public record MessageData
     {
         public required string Message_id { get; set; }
         public string? Root_id { get; set; }
@@ -334,15 +375,15 @@ namespace Feishu.Message.Response
         public required MessageBody Body { get; set; }
         public MentionsData[]? Mentions { get; set; }
     }
-    public class MessageBody { public required string Content { get; set; } }
-    public class SenderData
+    public record MessageBody { public required string Content { get; set; } }
+    public record SenderData
     {
         public required string Id { get; set; }
         public required string Id_type { get; set; }
         public required string Sender_type { get; set; }
         public string? Tenant_key { get; set; }
     }
-    public class MentionsData
+    public record MentionsData
     {
         public required string Key { get; set; }
         public required string? Id { get; set; }

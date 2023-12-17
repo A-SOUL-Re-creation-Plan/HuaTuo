@@ -1,9 +1,13 @@
-﻿using Feishu.Message;
+﻿using Feishu.Debug;
+using Feishu.Message;
 using RestSharp;
 using System.Text.Json;
 
 namespace Feishu
 {
+    /// <summary>
+    /// 时间戳模块
+    /// </summary>
     public class Timestamp
     {
         public enum TimestampType
@@ -64,7 +68,9 @@ namespace Feishu
         }
     }
 
-    // 通用工具
+    /// <summary>
+    /// Http工具，包含序列化参数和飞书错误反序列化模板
+    /// </summary>
     public static class HttpTools
     {
         private static readonly JsonSerializerOptions json_option = new JsonSerializerOptions
@@ -98,6 +104,16 @@ namespace Feishu
         }
     }
 
+    [AttributeUsage(AttributeTargets.Method)]
+    public class CommandMarkerAttribute : Attribute
+    {
+        public string Keyword { get; set; }
+        public CommandMarkerAttribute(string keyword) => Keyword = keyword;
+    }
+
+    /// <summary>
+    /// 飞书ID
+    /// </summary>
     public sealed class LarkID
     {
         public readonly string id;
@@ -124,32 +140,71 @@ namespace Feishu
         }
     }
 
+    /// <summary>
+    /// 机器人主体管理类
+    /// </summary>
     public sealed class BotApp
     {
-        public readonly string app_id;
-
-        private readonly Authentication.TenantAccessToken tenant_accessToken;
-
-        public BotApp(string app_id, string app_secret)
-        {
-            this.tenant_accessToken = new(app_id, app_secret);
-            this.app_id = app_id;
-            // 同时初始化功能模块
-            message = new MessageRequest(this);
-        }
-
-        public async Task RefreashToken() => await tenant_accessToken.Refreash();
+        // 基本信息
+        public readonly HuaTuo.Program.HuaTuoConfigFileFeishu Info;
+        public readonly HuaTuo.Program.HuaTuoConfigFileConfig Config;
+        public readonly ILogger Logger;
         public string Token { get => tenant_accessToken.Token; }
 
-        public MessageRequest message;
+        // 附加模块
+
+        // 功能模块
+        public async Task RefreashToken() => await tenant_accessToken.Refreash();
+        public MessageRequest Message { get; }
+
+        // 公用HTTP池
+        private readonly RestClient restClient;
+        private readonly Authentication.TenantAccessToken tenant_accessToken;
+
+        public BotApp(HuaTuo.Program.HuaTuoConfigFile cfg_file, ILogger logger)
+        {
+            Logger = logger;
+            restClient = new();
+            this.Info = cfg_file.Feishu;
+            this.Config = cfg_file.Config;
+            this.tenant_accessToken = new(cfg_file.Feishu.App_id, cfg_file.Feishu.App_secret, restClient);
+            // 同时初始化功能模块
+            this.Message = new MessageRequest(this, restClient);
+        }
     }
 
-    public class FeishuErrorResponse
+    /// <summary>
+    /// 群组类
+    /// </summary>
+    public class LarkGroup
+    {
+        public readonly LarkID Chat_id;
+        public readonly BotApp botApp;
+        public readonly MessageRequest Message;
+
+        public LarkGroup(BotApp botApp, LarkID chat_id)
+        {
+            this.botApp = botApp;
+            this.Message = botApp.Message;
+            Chat_id = chat_id;
+        }
+
+        public async Task<Message.Response.MessageSendResponse> SendMessage(IMessageContent content, string? uuid = null) =>
+            await this.botApp.Message.SendMessage(content, Chat_id, uuid);
+    }
+
+    /// <summary>
+    /// 飞书反馈的错误内容
+    /// </summary>
+    public record FeishuErrorResponse
     {
         public required int Code { get; set; }
         public required string Msg { get; set; }
     }
 
+    /// <summary>
+    /// 飞书反馈的错误
+    /// </summary>
     public sealed class FeishuException : Exception
     {
         public FeishuErrorResponse Response { get; }

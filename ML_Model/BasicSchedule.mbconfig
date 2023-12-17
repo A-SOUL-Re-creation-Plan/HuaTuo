@@ -2,7 +2,8 @@
   "Scenario": "ObjectDetection",
   "DataSource": {
     "Type": "Vott",
-    "Version": 1
+    "Version": 1,
+    "FilePath": "C:\\Model_Predict\\vott-json-export\\Basic_Schedule_Predict-export.json"
   },
   "Environment": {
     "Type": "LocalCPU",
@@ -68,7 +69,7 @@
   "TrainingOption": {
     "Version": 0,
     "Type": "ObjectDetectionTrainingOption",
-    "TrainingTime": 0,
+    "TrainingTime": 2147483647,
     "Epoch": 5,
     "ScoreThreshold": 0.35,
     "IOUThreshold": 0.5,
