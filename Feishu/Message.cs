@@ -146,13 +146,13 @@ namespace Feishu.Message
     /// <summary>
     /// 消息管理主体
     /// </summary>
-    public class MessageRequest
+    public class MessageClient
     {
         private static readonly Uri _base_uri = new("https://open.feishu.cn/open-apis/im/v1/messages/");
         private readonly RestClient _client;
         private readonly BotApp app;
 
-        public MessageRequest(BotApp app, RestClient client)
+        public MessageClient(BotApp app, RestClient client)
         {
             this._client = client;
             this.app = app;
@@ -168,7 +168,7 @@ namespace Feishu.Message
         /// <exception cref="Exception">反序列化失败</exception>
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
-        public async Task<Response.MessageSendResponse> SendMessage(IMessageContent content, LarkID receive_id, string? uuid = null)
+        public async Task<Response.MessageSendResponse> SendMessageAsync(IMessageContent content, LarkID receive_id, string? uuid = null)
         {
             // 获取Token
             var token = app.RefreashToken();
@@ -202,7 +202,7 @@ namespace Feishu.Message
         /// <exception cref="Exception">反序列化发生错误</exception>
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
-        public async Task<Response.MessageGetResponse> GetMessage(string message_id)
+        public async Task<Response.MessageGetResponse> GetMessageAsync(string message_id)
         {
             var token = app.RefreashToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
@@ -226,7 +226,7 @@ namespace Feishu.Message
         /// <exception cref="Exception">反序列化发生错误</exception>
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
-        public async Task<Response.MessageSendResponse> ReplyMessage(IMessageContent content, string message_id, string? uuid = null)
+        public async Task<Response.MessageSendResponse> ReplyMessageAsync(IMessageContent content, string message_id, string? uuid = null)
         {
             var token = app.RefreashToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}/reply");
@@ -328,6 +328,7 @@ namespace Feishu.Message
             client.AddDefaultParameter("image_type", "message");
             var request = new RestRequest();
 
+            img_stream.Seek(0, SeekOrigin.Begin);
             request.AddFile("image", () => img_stream, "a.png");
 
             await token;

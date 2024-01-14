@@ -1,8 +1,8 @@
 using Feishu;
 using Feishu.Event;
-using Feishu.Serve;
+using HuaTuo.Service;
 using Nett;
-using System.Text.Json;
+using System.Reflection;
 using System.Text.Json.Nodes;
 
 namespace HuaTuo
@@ -21,6 +21,12 @@ namespace HuaTuo
 
             // 注册BotApp
             BotApp botApp = new BotApp(cConfigFile, app.Logger);
+
+            // 注册group
+            foreach (var item in cConfigFile.Group)
+            {
+                botApp.RegisterGroup(new LarkGroup(botApp, new LarkID(item.Chat_id), new JiHuaProcessor()));
+            }
 
             // 消息事件
             EventManager.RegisterHandlerClass<MessageReceiveHandler>("im.message.receive_v1");
@@ -81,6 +87,27 @@ namespace HuaTuo
             app.Run("http://localhost:3000");
         }
 
+        public static T ToDeepCopy<T>(T obj)
+        {
+            if (obj == null)
+            {
+                return obj;
+            }
+            var type = obj.GetType();
+            if (obj is string || type.IsValueType)
+            {
+                return obj;
+            }
+
+            var result = Activator.CreateInstance(type)!;
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+            foreach (var field in fields)
+            {
+                field.SetValue(result, field.GetValue(obj));
+            }
+            return (T)result;
+        }
+
         /// <summary>
         /// 配置文件基类
         /// </summary>
@@ -88,6 +115,7 @@ namespace HuaTuo
         {
             public required HuaTuoConfigFileFeishu Feishu { get; set; }
             public required HuaTuoConfigFileConfig Config { get; set; }
+            public required HuaTuoConfigFileGroup[] Group {  get; set; }
         }
 
         /// <summary>
@@ -101,12 +129,20 @@ namespace HuaTuo
             public required string Encrypt_Key { get; set; }
         }
 
+        /// <summary>
+        /// 配置文件中的Config表
+        /// </summary>
         public record HuaTuoConfigFileConfig
         {
             public required string Debug_group { get; set; }
             public required string Bot_Open_id { get; set; }
-            public required string[] JiHua_Serve {  get; set; }
-            public required string[] Debug_Serve { get; set; }
+
+        }
+
+        public record HuaTuoConfigFileGroup
+        {
+            public required string Chat_id { get; set; }
+            public required bool Debug { get; set; }
         }
     }
 }

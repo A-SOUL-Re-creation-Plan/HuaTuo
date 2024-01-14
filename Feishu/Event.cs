@@ -16,7 +16,7 @@ namespace Feishu.Event
 
         public FeishuEventHandler(BotApp botApp) => this.botApp = botApp;
 
-        public abstract void EventCallback(string json_content);
+        public abstract Task EventCallback(string json_content);
     }
 
     /// <summary>

@@ -1,5 +1,8 @@
-﻿using Feishu.Debug;
+﻿using Feishu.Calendar;
+using Feishu.Event;
 using Feishu.Message;
+using HuaTuo.Service;
+using HuaTuo.Service.EventClass;
 using RestSharp;
 using System.Text.Json;
 
@@ -107,8 +110,8 @@ namespace Feishu
     [AttributeUsage(AttributeTargets.Method)]
     public class CommandMarkerAttribute : Attribute
     {
-        public string Keyword { get; set; }
-        public CommandMarkerAttribute(string keyword) => Keyword = keyword;
+        public string[] Keywords { get; set; }
+        public CommandMarkerAttribute(params string[] keyword) => this.Keywords = keyword;
     }
 
     /// <summary>
@@ -118,6 +121,8 @@ namespace Feishu
     {
         public readonly string id;
         public readonly string id_type;
+
+        public override string ToString() => id;
 
         public LarkID(string id)
         {
@@ -146,8 +151,7 @@ namespace Feishu
     public sealed class BotApp
     {
         // 基本信息
-        public readonly HuaTuo.Program.HuaTuoConfigFileFeishu Info;
-        public readonly HuaTuo.Program.HuaTuoConfigFileConfig Config;
+        public readonly HuaTuo.Program.HuaTuoConfigFile configFile;
         public readonly ILogger Logger;
         public string Token { get => tenant_accessToken.Token; }
 
@@ -155,7 +159,13 @@ namespace Feishu
 
         // 功能模块
         public async Task RefreashToken() => await tenant_accessToken.Refreash();
-        public MessageRequest Message { get; }
+        public MessageClient Message { get; }
+        public EventClient EventClient { get; }
+
+        // 群组
+        private Dictionary<string, LarkGroup> Groups { get; set; } = new Dictionary<string, LarkGroup>();
+        public void RegisterGroup(LarkGroup group) => this.Groups.Add(group.Chat_id.id, group);
+        public void TryGetGroupInstance(LarkID chat_id, out LarkGroup? group) => this.Groups.TryGetValue(chat_id.id, out group);
 
         // 公用HTTP池
         private readonly RestClient restClient;
@@ -165,12 +175,19 @@ namespace Feishu
         {
             Logger = logger;
             restClient = new();
-            this.Info = cfg_file.Feishu;
-            this.Config = cfg_file.Config;
+            this.configFile = cfg_file;
             this.tenant_accessToken = new(cfg_file.Feishu.App_id, cfg_file.Feishu.App_secret, restClient);
             // 同时初始化功能模块
-            this.Message = new MessageRequest(this, restClient);
+            this.Message = new MessageClient(this, restClient);
+            this.EventClient = new EventClient(this, restClient);
         }
+    }
+
+    public enum GroupStatus
+    {
+        Free,
+        Busy,
+        Waiting
     }
 
     /// <summary>
@@ -178,19 +195,43 @@ namespace Feishu
     /// </summary>
     public class LarkGroup
     {
+        // 记录一些基本信息
         public readonly LarkID Chat_id;
         public readonly BotApp botApp;
-        public readonly MessageRequest Message;
 
-        public LarkGroup(BotApp botApp, LarkID chat_id)
+        // 附加模块
+
+        // 简易状态机与消息处理
+        private GroupStatus status = GroupStatus.Free;
+        public GroupStatus Status { get => this.status; }
+        private CommandProcessor messageProcessor;
+        public string[]? RecentReceive { get; set; }
+
+        // 消息处理
+        public async Task MessageCallback(EventContent<MessageReceiveBody> cEventContent)
         {
-            this.botApp = botApp;
-            this.Message = botApp.Message;
-            Chat_id = chat_id;
+            lock (this)
+            {
+                if (this.status == GroupStatus.Free)
+                    this.status = GroupStatus.Busy;
+                else return;
+            }
+            try
+            {
+                await messageProcessor.CommandCallback(cEventContent, this);
+            }
+            finally { this.status = GroupStatus.Free; }
         }
 
-        public async Task<Message.Response.MessageSendResponse> SendMessage(IMessageContent content, string? uuid = null) =>
-            await this.botApp.Message.SendMessage(content, Chat_id, uuid);
+        public LarkGroup(BotApp botApp, LarkID chat_id, CommandProcessor processor)
+        {
+            this.botApp = botApp;
+            Chat_id = chat_id;
+            this.messageProcessor = processor;
+        }
+
+        public async Task<Message.Response.MessageSendResponse> SendMessageAsync(IMessageContent content, string? uuid = null) =>
+            await this.botApp.Message.SendMessageAsync(content, Chat_id, uuid);
     }
 
     /// <summary>
