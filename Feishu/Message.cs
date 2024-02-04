@@ -24,6 +24,13 @@ namespace Feishu.Message
 
         public TextContent() { }
         public TextContent(string text) { Text = text; }
+
+        public void Add(string content) { Text += content; }
+        public void AddAt(LarkID id) { Text += $"<at user_id=\"{id.id}\"></at>"; }
+        public void AddUnerline(string content) { Text += $"<u>{content}</u>"; }
+        public void AddDelete(string content) { Text += $"<s>{content}</s>"; }
+        public void AddBold(string content) { Text += $"<b>{content}</b>"; }
+        public void AddItalic(string content) { Text += $"<i>{content}</i>"; }
     }
 
     /// <summary>

@@ -3,22 +3,33 @@ using System.Text.Json;
 
 namespace Feishu.Calendar
 {
-    public class EventClient
+    public class CalendarClient
     {
         private static readonly Uri _base_uri = new("https://open.feishu.cn/open-apis/calendar/v4/calendars/");
         private readonly RestClient _client;
         private readonly BotApp app;
 
-        public EventClient(BotApp app, RestClient client)
+        public string CalendarId { get; init; }
+
+        public CalendarClient(BotApp app, RestClient client, string calendar_id)
         {
             _client = client;
             this.app = app;
+            this.CalendarId = calendar_id;
         }
 
-        public async Task<CalendarBody.GetEventResponse> GetEvent(string calendar_id, string event_id)
+        /// <summary>
+        /// 获取日程信息
+        /// </summary>
+        /// <param name="event_id">日程ID</param>
+        /// <returns>CalendarBody.GetEventResponse</returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task<CalendarBody.GetEventResponse> GetEvent(string event_id)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{_base_uri.OriginalString}{calendar_id}/events/{event_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
@@ -29,12 +40,24 @@ namespace Feishu.Calendar
                 throw new Exception("Deserialize Failed");
         }
 
-        public async Task<CalendarBody.GetEventListResponse> GetEventList(string calendar_id, string? start_time = null, string? end_time = null,
+        /// <summary>
+        /// 获取日程列表
+        /// </summary>
+        /// <param name="start_time">开始时间（戳）</param>
+        /// <param name="end_time">结束时间（戳）</param>
+        /// <param name="page_size">页大小</param>
+        /// <param name="page_token"></param>
+        /// <param name="sync_token"></param>
+        /// <returns>CalendarBody.GetEventListResponse</returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task<CalendarBody.GetEventListResponse> GetEventList(string? start_time = null, string? end_time = null,
             int? page_size = null, string? page_token = null, string? sync_token = null)
         {
             var token = app.RefreashToken();
 
-            RestRequest request = new RestRequest($"{_base_uri.OriginalString}{calendar_id}/events/");
+            RestRequest request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/");
             if (start_time != null) request.AddQueryParameter("start_time", start_time);
             if (end_time != null) request.AddQueryParameter("end_time", end_time);
             if (page_size != null) request.AddQueryParameter("page_size", page_size.ToString());
@@ -50,10 +73,18 @@ namespace Feishu.Calendar
                 throw new Exception("Deserialize Failed");
         }
 
-        public async Task<CalendarBody.GetEventResponse> CreateEvent(string calendar_id, CalendarEvent calendarEvent)
+        /// <summary>
+        /// 创建日程
+        /// </summary>
+        /// <param name="calendarEvent">要创建的日程</param>
+        /// <returns>CalendarBody.GetEventResponse</returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task<CalendarBody.GetEventResponse> CreateEvent(CalendarEvent calendarEvent)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{_base_uri.OriginalString}{calendar_id}/events/");
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/");
 
             request.AddBody(calendarEvent);
 
@@ -66,10 +97,18 @@ namespace Feishu.Calendar
                 throw new Exception("Deserialize Failed");
         }
 
-        public async Task DeleteEvent(string calendar_id, string event_id)
+        /// <summary>
+        /// 删除日程
+        /// </summary>
+        /// <param name="event_id">日程ID</param>
+        /// <returns></returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task DeleteEvent(string event_id)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{_base_uri.OriginalString}{calendar_id}/events/{event_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
@@ -78,10 +117,19 @@ namespace Feishu.Calendar
             HttpTools.EnsureSuccessful(resp);
         }
 
-        public async Task<CalendarBody.GetEventResponse> EditEvent(string calendar_id, string event_id, CalendarEvent calendarEvent)
+        /// <summary>
+        /// 编辑日程
+        /// </summary>
+        /// <param name="event_id">日程ID</param>
+        /// <param name="calendarEvent">要更新的日程</param>
+        /// <returns></returns>
+        /// <exception cref="Exception">反序列化失败</exception>
+        /// <exception cref="FeishuException">飞书端抛出错误</exception>
+        /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
+        public async Task<CalendarBody.GetEventResponse> EditEvent(string event_id, CalendarEvent calendarEvent)
         {
             var token = app.RefreashToken();
-            var request = new RestRequest($"{_base_uri.OriginalString}{calendar_id}/events/{event_id}");
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             request.AddBody(calendarEvent);
 
@@ -134,9 +182,9 @@ namespace Feishu.Calendar.CalendarBody
     public record GetListData
     {
         public bool Has_more { get; set; }
-        public string? Page_token { get; set; }
-        public string? Sync_token { get; set; }
-        public CalendarEvent[]? Items { get; set; }
+        public required string Page_token { get; set; }
+        public required string Sync_token { get; set; }
+        public required CalendarEvent[] Items { get; set; }
     }
 
     public record CalendarEvent

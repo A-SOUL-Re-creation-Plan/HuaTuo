@@ -1,8 +1,8 @@
 ﻿using Feishu;
-using Feishu.Debug;
 using Feishu.Event;
 using Feishu.Message;
 using HuaTuo.Service.EventClass;
+using HuaTuoMain.Service;
 using System.Reflection;
 using System.Text.Json.Nodes;
 
@@ -12,7 +12,7 @@ namespace HuaTuo.Service
     {
         public CommandProcessor() { ConstructCommandMap(); }
 
-        protected readonly Dictionary<string, Func<EventContent<MessageReceiveBody>, LarkGroup, Task>> command_map = new();
+        protected readonly Dictionary<string, Func<EventContent<MessageReceiveBody>, string[], LarkGroup, Task>> command_map = new();
 
         protected void ConstructCommandMap()
         {
@@ -24,10 +24,24 @@ namespace HuaTuo.Service
                 {
                     foreach (string item in attr.Keywords)
                     {
-                        command_map.Add(item, method.CreateDelegate<Func<EventContent<MessageReceiveBody>, LarkGroup, Task>>(this));
+                        command_map.Add(item, method.CreateDelegate<Func<EventContent<MessageReceiveBody>, string[], LarkGroup, Task>>(this));
                     }
                 }
             }
+        }
+
+        protected async Task ErrPointOut(string[] text, byte index, string message, LarkID at, LarkGroup larkGroup)
+        {
+            var msg = new TextContent();
+            msg.AddAt(at);
+            msg.Add("\n");
+            for (byte i = 0; i < text.Length; i++)
+            {
+                if (i == index) msg.Add($"<b><u>{text[i]}</u></b> ");
+                else msg.Add(text[i] + " ");
+            }
+            msg.Add("\n" + message);
+            await larkGroup.SendMessageAsync(msg);
         }
 
         public abstract Task CommandCallback(EventContent<MessageReceiveBody> cEventContent, LarkGroup larkGroup);
@@ -50,13 +64,63 @@ namespace HuaTuo.Service
             if (text_content.Length < 2) return;
             this.command_map.TryGetValue(text_content[1], out var func);
             if (func == null) return;
-            await func.Invoke(cEventContent, larkGroup);
+            await func.Invoke(cEventContent, text_content, larkGroup);
         }
 
         [CommandMarker("version", "版本")]
-        public async Task Version(EventContent<MessageReceiveBody> cEventContent, LarkGroup larkGroup)
+        public async Task Version(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
-            await larkGroup.SendMessageAsync(new TextContent("计画驼 v4.0测试版"));
+            await larkGroup.SendMessageAsync(new TextContent(larkGroup.botApp.configFile.Setting.VersionDesp));
+        }
+
+        [CommandMarker("简介")]
+        public async Task DespGenerate(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            // 不包含日期参数，则以当天为日期
+            DateTime date = DateTime.Now;
+            date = new DateTime(date.Year, date.Month, date.Day);
+            // 指令有效性检查
+            if (param.Length > 3) 
+            { 
+                await ErrPointOut(param, 1, "呜呜呜，接收这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                return;
+            }
+            if (param.Length == 3)
+            {
+                if (!DateTime.TryParseExact(param[2], "MM-dd", null, System.Globalization.DateTimeStyles.None, out var parsed))
+                {
+                    await ErrPointOut(param, 2, "呜呜呜，形状太奇怪了", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                    return;
+                }
+                date = new DateTime(date.Year, parsed.Month, parsed.Day);
+            }
+            // 获得日程信息
+            var t_start = Timestamp.DateToTimestamp(date);
+            var event_list = await larkGroup.botApp.Calendar.GetEventList(t_start.ToString(), (t_start + 86400).ToString());
+            // 没有可用的日程
+            if (event_list.Data.Items.Length < 1)
+            {
+                var msg = new TextContent($"小伙伴你好，{date.Month}月{date.Day}日暂时没有日程哦~");
+                await larkGroup.SendMessageAsync(msg);
+                var sticker = new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerNonp));
+                await larkGroup.SendMessageAsync(sticker);
+                return;
+            }
+            var task_manager = larkGroup.SendMessageAsync(new TextContent($"小伙伴你好，{date.Month}月{date.Day}日共有{event_list.Data.Items.Length}个日程，以下为生成的简介[送心]"));
+            foreach (var item in event_list.Data.Items)
+            {
+                var s_time = Timestamp.TimestampToDate(item.Start_time.Timestamp);
+                var text = new TextContent($"开始于{s_time:HH:mm}的【{item.Summary}】\n");
+                text.AddBold("当日直播间\n");
+                text.Add(DespGenerator.GenerateLiveRoom(item.Color) + "\n");
+                text.AddBold("简介\n");
+                if (item.Summary == null) continue;
+                if (item.Description == null || item.Description.Length < 2) item.Description = "标题";
+                text.Add(DespGenerator.GenerateDesp(item.Summary, item.Description, date));
+                await task_manager;
+                task_manager = larkGroup.SendMessageAsync(text);
+            }
+            await task_manager;
         }
     }
 
@@ -110,9 +174,9 @@ namespace HuaTuo.Service
                     text_content.CopyTo(larkGroup.RecentReceive, 0);
                     return;
                 }
-                else
+                else                                         
                 {
-                    await larkGroup.MessageCallback(cEventBody);
+                    await Task.Run(() => larkGroup.MessageCallback(cEventBody));
                 }
             }
             // 没有在@成员的情况

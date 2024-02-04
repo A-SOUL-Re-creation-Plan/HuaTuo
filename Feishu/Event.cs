@@ -7,14 +7,12 @@ namespace Feishu.Event
     /// <summary>
     /// 事件回调类的基类，继承自该类，实现EventCallback方法
     /// </summary>
-    public abstract class FeishuEventHandler
+    public abstract class FeishuEventHandler(BotApp botApp)
     {
-        protected readonly BotApp botApp;
+        protected readonly BotApp botApp = botApp;
 
         protected EventContent<T> DeserializeData<T>(string json_content) where T : class =>
             JsonSerializer.Deserialize<EventContent<T>>(json_content, HttpTools.JsonOption)!;
-
-        public FeishuEventHandler(BotApp botApp) => this.botApp = botApp;
 
         public abstract Task EventCallback(string json_content);
     }

@@ -115,6 +115,7 @@ namespace HuaTuo
         {
             public required HuaTuoConfigFileFeishu Feishu { get; set; }
             public required HuaTuoConfigFileConfig Config { get; set; }
+            public required HuaTuoConfigFileSetting Setting { get; set; }
             public required HuaTuoConfigFileGroup[] Group {  get; set; }
         }
 
@@ -136,9 +137,21 @@ namespace HuaTuo
         {
             public required string Debug_group { get; set; }
             public required string Bot_Open_id { get; set; }
-
+            public required string BotCalendarID { get; set; }
         }
 
+        /// <summary>
+        /// 配置文件中的Setting表
+        /// </summary>
+        public record HuaTuoConfigFileSetting
+        {
+            public required string VersionDesp { get; set; }
+            public required string[] StickerNonp { get; set; }
+        }
+
+        /// <summary>
+        /// 配置文件中的Group组
+        /// </summary>
         public record HuaTuoConfigFileGroup
         {
             public required string Chat_id { get; set; }

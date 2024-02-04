@@ -160,7 +160,7 @@ namespace Feishu
         // 功能模块
         public async Task RefreashToken() => await tenant_accessToken.Refreash();
         public MessageClient Message { get; }
-        public EventClient EventClient { get; }
+        public CalendarClient Calendar { get; }
 
         // 群组
         private Dictionary<string, LarkGroup> Groups { get; set; } = new Dictionary<string, LarkGroup>();
@@ -179,7 +179,12 @@ namespace Feishu
             this.tenant_accessToken = new(cfg_file.Feishu.App_id, cfg_file.Feishu.App_secret, restClient);
             // 同时初始化功能模块
             this.Message = new MessageClient(this, restClient);
-            this.EventClient = new EventClient(this, restClient);
+            this.Calendar = new CalendarClient(this, restClient, configFile.Config.BotCalendarID);
+        }
+
+        public string RandomSomething(string[] list)
+        {
+            return list[Random.Shared.Next(0, list.Length - 1)];
         }
     }
 
@@ -218,7 +223,7 @@ namespace Feishu
             }
             try
             {
-                await messageProcessor.CommandCallback(cEventContent, this);
+                await Task.Run(() => messageProcessor.CommandCallback(cEventContent, this));
             }
             finally { this.status = GroupStatus.Free; }
         }
