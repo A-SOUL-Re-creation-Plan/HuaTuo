@@ -23,9 +23,7 @@
     <PackageReference Include="SciSharp.TensorFlow.Redist" Version="2.16.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.1" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.0" />
+    <PackageReference Include="TencentCloudSDK.Ocr" Version="3.0.948" />
     <PackageReference Include="TorchSharp-cpu" Version="0.99.5" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="CloudServe\" />
   </ItemGroup>
 </Project>

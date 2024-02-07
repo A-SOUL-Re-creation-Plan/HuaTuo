@@ -2,7 +2,9 @@
 using Feishu.Event;
 using Feishu.Message;
 using HuaTuo.Service.EventClass;
+using HuaTuoMain.CloudServe;
 using HuaTuoMain.Service;
+using SixLabors.ImageSharp;
 using System.Reflection;
 using System.Text.Json.Nodes;
 
@@ -122,6 +124,126 @@ namespace HuaTuo.Service
             }
             await task_manager;
         }
+
+        [CommandMarker("日程")]
+        public async Task ScheduleCreating(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            // 检查父消息
+            if (cEventContent.Event.Message.Parent_id == null)
+            {
+                await larkGroup.SendMessageAsync(new TextContent("小伙伴你好，请指定一条包含日程表图片消息~"));
+                return;
+            }
+            var parent_message = await larkGroup.botApp.Message.GetMessageAsync(cEventContent.Event.Message.Parent_id);
+            if (parent_message.Data.Items[0].Msg_type != "post" && parent_message.Data.Items[0].Msg_type != "image")
+            {
+                await larkGroup.SendMessageAsync(new TextContent("小伙伴你好，指定的消息不是图片或富文本"));
+                return;
+            }
+
+            // 抓取图片
+            List<Task<byte[]>> images_task = new List<Task<byte[]>>();
+            if (parent_message.Data.Items[0].Msg_type == "post")
+            {
+                JsonNode nPostBody = JsonNode.Parse(parent_message.Data.Items[0].Body.Content)!;
+                foreach (var paragraph in nPostBody["content"]!.AsArray())
+                {
+                    foreach (var element in paragraph!.AsArray())
+                    {
+                        // 每一个element
+                        if (element!["tag"]!.ToString() == "img")
+                            images_task.Add(larkGroup.botApp.Message.DownloadFromMessage(parent_message.Data.Items[0].Message_id, element!["image_key"]!.ToString()));
+                    }
+                }
+            }
+            else
+            {
+                var file_key = JsonNode.Parse(parent_message.Data.Items[0].Body.Content)!["image_key"]!.ToString();
+                images_task.Add(larkGroup.botApp.Message.DownloadFromMessage(parent_message.Data.Items[0].Message_id, file_key));
+            }
+
+            try { Task.WaitAll(images_task.ToArray()); }
+            catch (Exception e) { await larkGroup.SendMessageAsync(new TextContent(e.Message)); return; }
+
+            // 检验图片
+            var text = new TextContent("现开始分析图片，此过程可能消耗时间，请小伙伴耐心等待~");
+            for (byte i = 0; i < images_task.Count; i++)
+            {
+                var image = Image.Load(images_task[i].Result);
+                if (image.Width != 3000 || image.Height != 2000)
+                    text.AddBold($"\n警告：图片{i+1}的大小不符合标准（应为3000x2000，实际为{image.Width}x{image.Height}），小画仍会尝试进行分析");
+                image.Dispose();
+            }
+            await larkGroup.SendMessageAsync(text);
+
+            // 检验日程表
+            List<Task> check_tasks = new List<Task>();
+            foreach (var task in images_task)
+            {
+                check_tasks.Add(Task.Run(async () => {
+                    var ocr_req = larkGroup.botApp.serviceOCR.RequestAsync(task.Result);
+                    var image = Image.Load(task.Result);
+                    // 计算位置
+                    int posx = (int)(0.5 * image.Width);
+                    int posy = (int)(0.08 * image.Height);
+                    int width = (int)(0.267 * image.Width);
+                    int height = (int)(0.085 * image.Height);
+
+                    var ocr_tool = new OcrTools(await ocr_req);
+                    var rencs = ocr_tool.SearchRectangle(posx, posy, width, height);
+                    foreach (var rectangle in rencs)
+                    {
+                        if (rectangle.DetectedText.Contains("本周日程表"))
+                            return;
+                    }
+                    throw new Exception("Not Confirmed");
+                }));
+            }
+            try { Task.WaitAll(check_tasks.ToArray()); }
+            catch (Exception e) { await larkGroup.SendMessageAsync(new TextContent($"至少一张图片未被确认为日程表，日程创建已取消\n{e.Message}")); return; }
+
+            // 运行模型
+            BotApp.memoryInfo.Refreash();
+            if (BotApp.memoryInfo.Avalible <= 1.0f)
+            {
+                await larkGroup.SendMessageAsync(new TextContent(
+                    $"<b>警告：可用内存过低({BotApp.memoryInfo.Avalible:0.0}GB)，运行模型可能失败</b>\n创建日程期间请尽量不调用机器人以防内存溢出"));
+            }
+            foreach (var task in images_task)
+            {
+                var process = new ScheduleProcess(new MemoryStream(task.Result));
+                try
+                {
+                    var result = await process.StartParsing(larkGroup.botApp);
+                    var image_key = larkGroup.botApp.Message.UploadImage(result.Image);
+
+                    var show_msg = new PostContent();
+                    show_msg.NewParagraph([PostContent.NewText($"共识别到{result.TotalDetected}个日程，成功创建{result.SuccessedCreated}个日程")]);
+                    // result.Errors.ToArray()
+                    // 不写为Errors.ToArray() 的原因是：自然段充当换行的作用
+                    foreach (var item in result.Errors) show_msg.Add([item]);
+                    show_msg.NewImgParagraph(await image_key);
+                    await larkGroup.SendMessageAsync(show_msg);
+                }
+                catch (Exception e)
+                {
+                    var err_msg = new TextContent("创建日程时发生错误(Parsing)\n");
+                    err_msg.Add(e.Message + "\n");
+                    err_msg.Add($"在Task：{task}");
+                    await larkGroup.SendMessageAsync(err_msg);
+                }
+            }
+        }
+
+        [CommandMarker("delete")]
+        public async Task DebuggingFunc(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            var list = await larkGroup.botApp.Calendar.GetEventList("1707227952");
+            foreach (var item in list.Data.Items)
+            {
+                await larkGroup.botApp.Calendar.DeleteEvent(item.Event_id);
+            }
+        }
     }
 
     /// <summary>
@@ -174,7 +296,7 @@ namespace HuaTuo.Service
                     text_content.CopyTo(larkGroup.RecentReceive, 0);
                     return;
                 }
-                else                                         
+                else
                 {
                     await Task.Run(() => larkGroup.MessageCallback(cEventBody));
                 }

@@ -5,7 +5,7 @@ using SixLabors.ImageSharp;
 
 namespace MlModel
 {
-    public class BasicSchedule
+    public static class BasicSchedule
     {
         public const int TrainingImageWidth = 900;
         public const int TrainingImageHeight = 600;
@@ -79,6 +79,16 @@ namespace MlModel
                 var boxes =
                 modelOutput.PredictedBoundingBoxes!.Chunk(4)
                     .Select((x, index) => new ModelPredictedBox(x[0], x[1], x[2], x[3], modelOutput.PredictedLabel![index], modelOutput.Score![index]))
+                    .ToArray();
+                return boxes;
+            }
+
+            public static ModelPredictedBox[] CreateWithFilter(ModelOutput modelOutput, double score)
+            {
+                var boxes =
+                modelOutput.PredictedBoundingBoxes!.Chunk(4)
+                    .Select((x, index) => new ModelPredictedBox(x[0], x[1], x[2], x[3], modelOutput.PredictedLabel![index], modelOutput.Score![index]))
+                    .Where(x => x.Score >= score)
                     .ToArray();
                 return boxes;
             }

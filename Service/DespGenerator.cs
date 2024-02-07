@@ -48,12 +48,12 @@
             _ => "A-SOUL"
         };
 
-        public static int ASOUL_FeishuColor(byte mem) => mem switch
+        public static int ASOUL_FeishuColor(string mem) => mem switch
         {
-            0x1 => -15417089, // Ava
-            0x2 => -562844,   // Bella
-            0x4 => -963671,   // Diana
-            0x8 => -10392859, // Eileen
+            "Ava" => -15417089, // Ava
+            "Bella" => -562844,   // Bella
+            "Diana" => -963671,   // Diana
+            "Eileen" => -10392859, // Eileen
             _ => -14838
         };
 
@@ -62,7 +62,7 @@
         /// </summary>
         /// <param name="summary">日程主题</param>
         /// <returns>byte</returns>
-        private static byte ParseLiveMember(string summary)
+        public static byte ParseLiveMember(string summary)
         {
             byte mem = 0;
             if (summary.Contains("夜谈")) mem |= 0x1;

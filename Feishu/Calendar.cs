@@ -1,4 +1,6 @@
-﻿using RestSharp;
+﻿using Feishu.Calendar.CalendarBody;
+using Microsoft.Extensions.Logging;
+using RestSharp;
 using System.Text.Json;
 
 namespace Feishu.Calendar
@@ -53,7 +55,7 @@ namespace Feishu.Calendar
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<CalendarBody.GetEventListResponse> GetEventList(string? start_time = null, string? end_time = null,
-            int? page_size = null, string? page_token = null, string? sync_token = null)
+            int? page_size = null, string? page_token = null, string? sync_token = null, bool ignore_cancelled = true)
         {
             var token = app.RefreashToken();
 
@@ -69,8 +71,17 @@ namespace Feishu.Calendar
 
             var resp = await _client.ExecuteAsync(request, Method.Get);
             HttpTools.EnsureSuccessful(resp);
-            return JsonSerializer.Deserialize<CalendarBody.GetEventListResponse>(resp.RawBytes, HttpTools.JsonOption) ??
+            var json_obj = JsonSerializer.Deserialize<CalendarBody.GetEventListResponse>(resp.RawBytes, HttpTools.JsonOption) ??
                 throw new Exception("Deserialize Failed");
+            if (ignore_cancelled)
+            {
+                List<CalendarEvent> event_list = json_obj.Data.Items.ToList();
+                List<CalendarEvent> editable_list = json_obj.Data.Items.ToList();
+                foreach (var event_obj in event_list)
+                    if (event_obj.Status == "cancelled") editable_list.Remove(event_obj);
+                json_obj.Data.Items = editable_list.ToArray();
+            }
+            return json_obj;
         }
 
         /// <summary>
@@ -81,7 +92,7 @@ namespace Feishu.Calendar
         /// <exception cref="Exception">反序列化失败</exception>
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
-        public async Task<CalendarBody.GetEventResponse> CreateEvent(CalendarEvent calendarEvent)
+        public async Task<CalendarBody.GetEventResponse> CreateEvent(CalendarEventEditable calendarEvent)
         {
             var token = app.RefreashToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/");
@@ -110,6 +121,8 @@ namespace Feishu.Calendar
             var token = app.RefreashToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
+            request.AddQueryParameter("need_notification", "false");
+
             await token;
             request.AddHeader("Authorization", $"Bearer {app.Token}");
 
@@ -126,7 +139,7 @@ namespace Feishu.Calendar
         /// <exception cref="Exception">反序列化失败</exception>
         /// <exception cref="FeishuException">飞书端抛出错误</exception>
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
-        public async Task<CalendarBody.GetEventResponse> EditEvent(string event_id, CalendarEvent calendarEvent)
+        public async Task<CalendarBody.GetEventResponse> EditEvent(string event_id, CalendarEventEditable calendarEvent)
         {
             var token = app.RefreashToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
@@ -141,9 +154,81 @@ namespace Feishu.Calendar
             return JsonSerializer.Deserialize<CalendarBody.GetEventResponse>(resp.RawBytes, HttpTools.JsonOption) ??
                 throw new Exception("Deserialize Failed");
         }
+
+        public async Task AddAttendees(string event_id, LarkID[] lark_id)
+        {
+            var token = app.RefreashToken();
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees");
+
+            List<object> attendees_list = new List<object>();
+            foreach (var person in lark_id)
+            {
+                if (person.id_type == "open_id")
+                {
+                    attendees_list.Add(new
+                    {
+                        type = "user",
+                        user_id = person.id
+                    });
+                }
+                else if (person.id_type == "chat_id")
+                {
+                    attendees_list.Add(new
+                    {
+                        type = "chat",
+                        chat_id = person.id
+                    });
+                }
+                else throw new NotSupportedException();
+            }
+
+            request.AddBody(new
+            {
+                attendees = attendees_list,
+                need_notification = false
+            });
+
+            await token;
+            request.AddHeader("Authorization", $"Bearer {app.Token}");
+
+            var resp = await _client.ExecuteAsync(request, Method.Post);
+            HttpTools.EnsureSuccessful(resp);
+        }
+
+        public async Task DeleteAttendeesUser(string event_id, string[] attendee_ids)
+        {
+            var token = app.RefreashToken();
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees/batch_delete");
+
+            request.AddBody(new
+            {
+                attendee_ids,
+                need_notification = false
+            });
+
+            await token;
+            request.AddHeader("Authorization", $"Bearer {app.Token}");
+
+            var resp = await _client.ExecuteAsync(request, Method.Post);
+            HttpTools.EnsureSuccessful(resp);
+        }
+
+        public async Task<CalendarBody.GetAttendeesResponse> GetAttendeesList(string event_id)
+        {
+            var token = app.RefreashToken();
+            var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees");
+
+            await token;
+            request.AddHeader("Authorization", $"Bearer {app.Token}");
+
+            var resp = await _client.ExecuteAsync(request, Method.Get);
+            HttpTools.EnsureSuccessful(resp);
+            return JsonSerializer.Deserialize<CalendarBody.GetAttendeesResponse>(resp.RawBytes, HttpTools.JsonOption) ??
+                throw new Exception("Deserialize Failed");
+        }
     }
 
-    public record CalendarEvent
+    public record CalendarEventEditable
     {
         public string? Summary { get; set; }
         public string? Description { get; set; }
@@ -196,8 +281,8 @@ namespace Feishu.Calendar.CalendarBody
         public required StartTime Start_time { get; set; }
         public required EndTime End_time { get; set; }
         public Vchat? Vchat { get; set; }
-        public required string Visibility { get; set; }
-        public required string Attendee_ability { get; set; }
+        public string? Visibility { get; set; }
+        public string? Attendee_ability { get; set; }
         public required int Color { get; set; }
         public Reminder[]? Reminders { get; set; }
         public required string Status { get; set; }
@@ -222,5 +307,30 @@ namespace Feishu.Calendar.CalendarBody
     public record Reminder
     {
         public int Minutes { get; set; }
+    }
+
+
+
+    public class GetAttendeesResponse
+    {
+        public required int Code { get; set; }
+        public required string Msg { get; set; }
+        public required AttendeesData Data { get; set; }
+    }
+
+    public class AttendeesData
+    {
+        public required AttendeesItem[] Items { get; set; }
+        public required bool Has_more { get; set; }
+        public string? Page_token { get; set; }
+    }
+
+    public class AttendeesItem
+    {
+        public required string Type { get; set; }
+        public required string Attendee_id { get; set; }
+        public required string Display_name { get; set; }
+        public string? User_id { get; set; }
+        public string? Chat_id { get; set; }
     }
 }

@@ -59,7 +59,7 @@ namespace HuaTuo
                     if (nJsonData["type"] != null)
                     {
                         // HTTP 验证，返回challenge
-                        if (nJsonData["type"]!.ToString() == "url_verification") return Results.BadRequest();
+                        if (nJsonData["type"]!.ToString() != "url_verification") return Results.BadRequest();
                         // 验证 Verification Token
                         if (nJsonData["token"]!.ToString() != cConfigFile.Feishu.Verification_Token) return Results.BadRequest();
                         return Results.Ok(new { challenge = nJsonData["challenge"]!.ToString() });
@@ -138,6 +138,14 @@ namespace HuaTuo
             public required string Debug_group { get; set; }
             public required string Bot_Open_id { get; set; }
             public required string BotCalendarID { get; set; }
+            public required string CloudSecretID { get; set; }
+            public required string CloudSecretKey { get; set; }
+            public required string FeishuID_Ava {  get; set; }
+            public required string FeishuID_Bella { get; set; }
+            public required string FeishuID_Diana { get; set; }
+            public required string FeishuID_Eileen { get; set; }
+            public required string FeishuID_Jihua { get; set; }
+            public required string FeishuID_ASOUL { get; set; }
         }
 
         /// <summary>

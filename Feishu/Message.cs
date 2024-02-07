@@ -76,7 +76,7 @@ namespace Feishu.Message
     public sealed class PostContent : IMessageContent
     {
         private string? title;
-        private readonly List<List<object>> content = new List<List<object>>();
+        private readonly List<object[]> content = new List<object[]>();
 
         public string ContentType { get => "post"; }
         public string Content
@@ -98,7 +98,7 @@ namespace Feishu.Message
         /// 向富文本中添加一段内容
         /// </summary>
         /// <param name="element_list">元素列表</param>
-        public void Add(List<object> element_list) => this.content.Add(element_list);
+        public void Add(object[] element_list) => this.content.Add(element_list);
 
         /// <summary>
         /// 为富文本添加标题
@@ -110,22 +110,22 @@ namespace Feishu.Message
         /// 向富文本中添加一段内容
         /// </summary>
         /// <param name="element_list">元素列表</param>
-        public void NewParagraph(List<object> element_list) => this.content.Add(element_list);
+        public void NewParagraph(object[] element_list) => this.content.Add(element_list);
 
-        public object NewText(string text) => new { tag = "text", text };
-        public object NewText(string text, List<string> style) => new { tag = "text", text, style };
+        public static object NewText(string text) => new { tag = "text", text };
+        public static object NewText(string text, string[] style) => new { tag = "text", text, style };
 
-        public object NewLink(string text, string href) => new { tag = "a", text, href };
-        public object NewLink(string text, string href, List<string> style) => new { tag = "a", text, href, style };
+        public static object NewLink(string text, string href) => new { tag = "a", text, href };
+        public static object NewLink(string text, string href, string[] style) => new { tag = "a", text, href, style };
 
-        public object NewAt() => new { tag = "at", user_id = "all" };
-        public object NewAt(List<string> style) => new { tag = "at", user_id = "all", style };
-        public object NewAt(LarkID open_id) => new { tag = "at", user_id = open_id.id };
-        public object NewAt(LarkID open_id, List<string> style) => new { tag = "at", user_id = open_id.id, style };
+        public static object NewAt() => new { tag = "at", user_id = "all" };
+        public static object NewAt(string[] style) => new { tag = "at", user_id = "all", style };
+        public static object NewAt(LarkID open_id) => new { tag = "at", user_id = open_id.id };
+        public static object NewAt(LarkID open_id, string[] style) => new { tag = "at", user_id = open_id.id, style };
 
-        public void NewImgParagraph(string image_key) => NewParagraph(new List<object> { new { tag = "img", image_key } });
+        public void NewImgParagraph(string image_key) => NewParagraph([new { tag = "img", image_key }]);
 
-        public object NewEmotion(FeishuMessageEmotion emoji) => new { tag = "emotion", emoji_type = Enum.GetName(emoji) };
+        public static object NewEmotion(FeishuMessageEmotion emoji) => new { tag = "emotion", emoji_type = Enum.GetName(emoji) };
 
     }
 
@@ -364,7 +364,12 @@ namespace Feishu.Message.Response
     {
         public required int Code { get; set; }
         public required string Msg { get; set; }
-        public required Dictionary<string, MessageData[]> Data { get; set; }
+        public required MessageGetRespItems Data { get; set; }
+    }
+
+    public record MessageGetRespItems
+    {
+        public required MessageData[] Items { get; set; }
     }
 
     // 以下为反序列用的类

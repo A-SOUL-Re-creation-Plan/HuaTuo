@@ -1,8 +1,10 @@
 ﻿using Feishu.Calendar;
 using Feishu.Event;
 using Feishu.Message;
+using Hardware.Info;
 using HuaTuo.Service;
 using HuaTuo.Service.EventClass;
+using HuaTuoMain.CloudServe;
 using RestSharp;
 using System.Text.Json;
 
@@ -69,6 +71,14 @@ namespace Feishu
                 ts = new DateTimeOffset(DateTime.Now.ToUniversalTime()).ToUnixTimeMilliseconds();
             return ts;
         }
+    }
+
+    public class MemoryInfos()
+    {
+        private HardwareInfo hw_info = new HardwareInfo();
+
+        public void Refreash() => hw_info.RefreshMemoryStatus();
+        public float Avalible { get => (float)hw_info.MemoryStatus.AvailablePhysical / 1073741824f; }
     }
 
     /// <summary>
@@ -156,14 +166,16 @@ namespace Feishu
         public string Token { get => tenant_accessToken.Token; }
 
         // 附加模块
+        public readonly ServiceOCR serviceOCR;
+        public static readonly MemoryInfos memoryInfo = new MemoryInfos();
 
         // 功能模块
         public async Task RefreashToken() => await tenant_accessToken.Refreash();
-        public MessageClient Message { get; }
-        public CalendarClient Calendar { get; }
+        public readonly MessageClient Message;
+        public readonly CalendarClient Calendar;
 
         // 群组
-        private Dictionary<string, LarkGroup> Groups { get; set; } = new Dictionary<string, LarkGroup>();
+        private readonly Dictionary<string, LarkGroup> Groups = new Dictionary<string, LarkGroup>();
         public void RegisterGroup(LarkGroup group) => this.Groups.Add(group.Chat_id.id, group);
         public void TryGetGroupInstance(LarkID chat_id, out LarkGroup? group) => this.Groups.TryGetValue(chat_id.id, out group);
 
@@ -180,6 +192,7 @@ namespace Feishu
             // 同时初始化功能模块
             this.Message = new MessageClient(this, restClient);
             this.Calendar = new CalendarClient(this, restClient, configFile.Config.BotCalendarID);
+            this.serviceOCR = new ServiceOCR(configFile.Config.CloudSecretID, configFile.Config.CloudSecretKey);
         }
 
         public string RandomSomething(string[] list)
