@@ -108,8 +108,8 @@ namespace HuaTuo.Service
         /// <param name="ocr_tool">OCR信息</param>
         /// <param name="hour">可选在默认情况下日程的时长（小时）</param>
         /// <returns>ProcessedResult</returns>
-        private async Task<ProcessedResult> ParseIndividual(BotApp app, 
-                                                            BasicSchedule.ModelPredictedBox block, 
+        private async Task<ProcessedResult> ParseIndividual(BotApp app,
+                                                            BasicSchedule.ModelPredictedBox block,
                                                             OcrTools ocr_tool, double? hour = null)
         {
             // 用于反馈创建的结果
@@ -139,7 +139,7 @@ namespace HuaTuo.Service
                 Vchat = new Vchat() { Vc_type = "no_meeting" },
                 Attendee_ability = "can_modify_event",
                 Visibility = "public",
-                Reminders = [new Reminder() { Minutes = 5}]
+                Reminders = [new Reminder() { Minutes = 5 }]
             };
             // 逐个循环识别，保证准确
             // 识别时间
@@ -311,14 +311,14 @@ namespace HuaTuo.Service
                 };
                 var size = TextMeasurer.MeasureSize(text, textOptions);
                 PointF[] lay_points = [
-                    new PointF(box.XTop, box.YTop - 80), 
-                    new PointF(box.XTop + size.Width + 20, box.YTop - 80), 
-                    new PointF(box.XTop + size.Width + 20, box.YTop), 
+                    new PointF(box.XTop, box.YTop - 80),
+                    new PointF(box.XTop + size.Width + 20, box.YTop - 80),
+                    new PointF(box.XTop + size.Width + 20, box.YTop),
                     new PointF(box.XTop, box.YTop)];
                 PointF[] points = [
-                    new PointF(box.XTop, box.YTop), 
-                    new PointF(box.XBottom, box.YTop), 
-                    new PointF(box.XBottom, box.YBottom), 
+                    new PointF(box.XTop, box.YTop),
+                    new PointF(box.XBottom, box.YTop),
+                    new PointF(box.XBottom, box.YBottom),
                     new PointF(box.XTop, box.YBottom)];
                 img.Mutate(x =>
                 {

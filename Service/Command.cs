@@ -65,7 +65,12 @@ namespace HuaTuo.Service
 
             if (text_content.Length < 2) return;
             this.command_map.TryGetValue(text_content[1], out var func);
-            if (func == null) return;
+            // 找不到回调
+            if (func == null)
+            {
+                await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerQuestioning)));
+                return;
+            }
             await func.Invoke(cEventContent, text_content, larkGroup);
         }
 
@@ -131,13 +136,13 @@ namespace HuaTuo.Service
             // 检查父消息
             if (cEventContent.Event.Message.Parent_id == null)
             {
-                await larkGroup.SendMessageAsync(new TextContent("小伙伴你好，请指定一条包含日程表图片消息~"));
+                await larkGroup.SendMessageAsync(new TextContent("要...要分析哪张图片呢"));
                 return;
             }
             var parent_message = await larkGroup.botApp.Message.GetMessageAsync(cEventContent.Event.Message.Parent_id);
             if (parent_message.Data.Items[0].Msg_type != "post" && parent_message.Data.Items[0].Msg_type != "image")
             {
-                await larkGroup.SendMessageAsync(new TextContent("小伙伴你好，指定的消息不是图片或富文本"));
+                await larkGroup.SendMessageAsync(new TextContent("不能分析奇怪的消息啦"));
                 return;
             }
 
@@ -235,6 +240,77 @@ namespace HuaTuo.Service
             }
         }
 
+        [CommandMarker("关键词")]
+        public async Task KeywordCommand(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            // 检查指令
+            if (param.Length > 5)
+            {
+                await ErrPointOut(param, 1, "呜呜呜，接收这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                return;
+            }
+            // 设定/删除
+            if (param.Length < 3)
+            {
+                await ErrPointOut(param, 1, "是要设定关键词还是删除关键词呢？", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerQuestioning)));
+                return;
+            }
+            var command = param[2] switch
+            {
+                "设定" => 1,
+                "删除" => 2,
+                _ => 0
+            };
+            if (command == 0)
+            {
+                await ErrPointOut(param, 2, "只能设定或者删除哦", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                return;
+            }
+            // 关键词
+            if (param.Length < 4)
+            {
+                await ErrPointOut(param, 1, "关键词是什么呢？", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerQuestioning)));
+                return;
+            }
+            var keyword = param[3];
+            // 类型（可选参数）
+            string keyword_type = "normal";
+            if (param.Length == 5)
+            {
+                keyword_type = param[4] switch
+                {
+                    "contains" => "contains",
+                    "包含" => "contains",
+                    _ => "normal"
+                };
+            }
+            // 开始操作
+            if (command == 1)
+            {
+                // 设定
+                if (cEventContent.Event.Message.Parent_id == null)
+                {
+                    await larkGroup.SendMessageAsync(new TextContent("触发关键词的时候，发送什么比较好呢？"));
+                    return;
+                }
+                var parent_message = await larkGroup.botApp.Message.GetMessageAsync(cEventContent.Event.Message.Parent_id);
+                var message = new FeishuMessageBody(parent_message.Data.Items[0].Body.Content, parent_message.Data.Items[0].Msg_type);
+                KeywordService.CreateNewKeyword(message, keyword, keyword_type);
+                KeywordService.SaveKeywordDatabase();
+                await larkGroup.SendMessageAsync(message);
+                return;
+            }
+            else
+            {
+                // 删除
+                KeywordService.RemoveKeyword(keyword);
+                KeywordService.SaveKeywordDatabase();
+                await larkGroup.SendMessageAsync(new TextContent($"成功删除【{keyword}】"));
+            }
+        }
+
         [CommandMarker("delete")]
         public async Task DebuggingFunc(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
@@ -275,9 +351,16 @@ namespace HuaTuo.Service
             JsonNode nMessageContent = JsonNode.Parse(cEventBody.Event.Message.Content)!;
 
             // 目前只接收TEXT和群聊消息哦
+            if (!cEventBody.Event.Message.Chat_type.Equals("group"))
+            {
+                var text = new TextContent($"From {cEventBody.Event.Sender.Sender_id.Open_id}\n");
+                text.Add(cEventBody.Event.Message.Content);
+                await botApp.Message.SendMessageAsync(text, new LarkID(botApp.configFile.Config.Bot_Debug_id));
+            }
             if (!cEventBody.Event.Message.Message_type.Equals("text")) return;
-            if (!cEventBody.Event.Message.Chat_type.Equals("group")) return;
-
+            // 找到对应群组
+            botApp.TryGetGroupInstance(new LarkID(cEventBody.Event.Message.Chat_id!), out var larkGroup);
+            if (larkGroup == null) return;
             // 得到文本内容
             string[] text_content = nMessageContent["text"]!.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
@@ -287,9 +370,7 @@ namespace HuaTuo.Service
                 // 是在@我吗？
                 if (cEventBody.Event.Message.Mentions[0].Id.Open_id != botApp.configFile.Config.Bot_Open_id) return;
                 if (text_content.Length < 2) return;
-                // 找到对应群组
-                botApp.TryGetGroupInstance(new LarkID(cEventBody.Event.Message.Chat_id!), out var larkGroup);
-                if (larkGroup == null) return;
+                
                 if (larkGroup.Status != GroupStatus.Free)
                 {
                     larkGroup.RecentReceive = new string[text_content.Length];
@@ -304,7 +385,12 @@ namespace HuaTuo.Service
             // 没有在@成员的情况
             else
             {
-
+                // 关键词检测
+                var text = nMessageContent["text"]!.ToString();
+                var message = KeywordService.SearchItem(text);
+                if (message == null) return;
+                foreach (var item in message)
+                    await larkGroup.SendMessageAsync(item);
             }
         }
     }

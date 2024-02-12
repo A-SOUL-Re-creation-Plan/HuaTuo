@@ -1,6 +1,7 @@
 using Feishu;
 using Feishu.Event;
 using HuaTuo.Service;
+using HuaTuoMain.Service;
 using Nett;
 using System.Reflection;
 using System.Text.Json.Nodes;
@@ -16,6 +17,9 @@ namespace HuaTuo
             // 加载config文件
             if (args.Length == 0) { Console.WriteLine("需要配置文件"); return; }
             else cConfigFile = Toml.ReadFile<HuaTuoConfigFile>(args[0]);
+
+            // 建立关键字库
+            KeywordService.ReadKeywordDatabase(args[1]);
 
             var app = WebApplication.Create();
 
@@ -135,8 +139,8 @@ namespace HuaTuo
         /// </summary>
         public record HuaTuoConfigFileConfig
         {
-            public required string Debug_group { get; set; }
             public required string Bot_Open_id { get; set; }
+            public required string Bot_Debug_id { get; set; }
             public required string BotCalendarID { get; set; }
             public required string CloudSecretID { get; set; }
             public required string CloudSecretKey { get; set; }
@@ -155,6 +159,7 @@ namespace HuaTuo
         {
             public required string VersionDesp { get; set; }
             public required string[] StickerNonp { get; set; }
+            public required string[] StickerQuestioning { get; set; }
         }
 
         /// <summary>
