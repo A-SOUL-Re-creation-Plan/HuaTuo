@@ -1,4 +1,5 @@
-﻿using Feishu;
+﻿using Bilibili;
+using Feishu;
 using Feishu.Event;
 using Feishu.Message;
 using HuaTuo.Service.EventClass;
@@ -80,6 +81,19 @@ namespace HuaTuo.Service
             await larkGroup.SendMessageAsync(new TextContent(larkGroup.botApp.configFile.Setting.VersionDesp));
         }
 
+        [CommandMarker("help", "帮助")]
+        public async Task HelpLink(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            var help = @"
+                简介生成 -> 简介 {date}
+                日程创建 -> 日程
+                关键词 -> 关键词 {设定/删除} {关键词} {一般/包含}*
+                稿件列表 -> 稿件列表
+
+                每个功能的具体说明请查看机器人主页的帮助文档~";
+            await larkGroup.SendMessageAsync(new TextContent(help));
+        }
+
         [CommandMarker("简介")]
         public async Task DespGenerate(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
@@ -87,8 +101,8 @@ namespace HuaTuo.Service
             DateTime date = DateTime.Now;
             date = new DateTime(date.Year, date.Month, date.Day);
             // 指令有效性检查
-            if (param.Length > 3) 
-            { 
+            if (param.Length > 3)
+            {
                 await ErrPointOut(param, 1, "呜呜呜，接收这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
                 return;
             }
@@ -176,7 +190,7 @@ namespace HuaTuo.Service
             {
                 var image = Image.Load(images_task[i].Result);
                 if (image.Width != 3000 || image.Height != 2000)
-                    text.AddBold($"\n警告：图片{i+1}的大小不符合标准（应为3000x2000，实际为{image.Width}x{image.Height}），小画仍会尝试进行分析");
+                    text.AddBold($"\n警告：图片{i + 1}的大小不符合标准（应为3000x2000，实际为{image.Width}x{image.Height}），小画仍会尝试进行分析");
                 image.Dispose();
             }
             await larkGroup.SendMessageAsync(text);
@@ -311,14 +325,44 @@ namespace HuaTuo.Service
             }
         }
 
-        [CommandMarker("delete")]
-        public async Task DebuggingFunc(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        [CommandMarker("稿件列表")]
+        public async Task ArchiveListCommand(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
-            var list = await larkGroup.botApp.Calendar.GetEventList("1707227952");
-            foreach (var item in list.Data.Items)
+            ///////此段代码与 Program.cs 中 InteractiveCallback 函数内相同，同时更新/////////
+            var bili_get = BiliAPI.ArchiveList(larkGroup.botApp.biliCredential, null);
+            var card = new InteractiveContent();
+            var date = DateTime.Now;
+            card.Header("稿件列表", $"上一次刷新：{date:G}", null, "wathet", [InteractiveContent.TextTag("v4.0", "purple")]);
+            card.Config();
+            var list_column_set = new InteractiveContent.ElementsBuilder()
+                .ColumnSet([
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=3,Vertical_align="top",Elements=[new {tag="markdown",content="**标题**(封面)",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**BVID**",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**状态**",text_align="center"}]},
+                    ], "grey");
+            var bili_data = await bili_get;
+            foreach (var video in bili_data.Data.Arc_audits)
             {
-                await larkGroup.botApp.Calendar.DeleteEvent(item.Event_id);
+                list_column_set.ColumnSet([
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=3,Vertical_align="top",Elements=[new {tag="markdown",content=$"[{video.Archive.Title}]({video.Archive.Cover})",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content=video.Archive.Bvid,text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content=$"{video.Archive.State}:{video.Archive.State_desc}",text_align="center"}]},
+                    ]);
             }
+            list_column_set.ExtraDiv($"全部稿件:{bili_data.Data.Page.Count}  " +
+                                     $"<font color='green'>通过:{bili_data.Data.Class.Pubed}</font>\n" +
+                                     $"<font color='grey'>处理中:{bili_data.Data.Class.Is_pubing}</font>  " +
+                                     $"<font color='red'>未通过:{bili_data.Data.Class.Not_pubed}</font>",
+                            new InteractiveContent.ActionBuilder()
+                                .SelectStatic("筛选会刷新信息哦~", [
+                                    InteractiveContent.Option("全部稿件", "all"),
+                                    InteractiveContent.Option("通过", "pubed"),
+                                    InteractiveContent.Option("处理中", "is_pubing"),
+                                    InteractiveContent.Option("未通过", "not_pubed")
+                                    ], new { action="refreash"}).Build()[0], true);
+            card.Elements(list_column_set.Build());
+            //////////////////////////////////////////////////////////////////////////////////
+            await larkGroup.SendMessageAsync(card);
         }
     }
 

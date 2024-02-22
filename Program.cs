@@ -1,10 +1,13 @@
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Bilibili;
 using Feishu;
 using Feishu.Event;
+using Feishu.Message;
 using HuaTuo.Service;
 using HuaTuoMain.Service;
 using Nett;
-using System.Reflection;
-using System.Text.Json.Nodes;
 
 namespace HuaTuo
 {
@@ -54,10 +57,21 @@ namespace HuaTuo
                     {
                         sRequestBody = await stream_reader.ReadToEndAsync();
                     }
+                    JsonNode nJsonData = JsonNode.Parse(sRequestBody)!;
+
+                    // 卡片回调不加密，此处检测token来判断
+                    if (nJsonData["token"] != null)
+                    {
+                        if (nJsonData["type"] != null && nJsonData["type"]!.ToString() == "url_verification")
+                            return Results.Ok(new { challenge = nJsonData["challenge"]!.ToString() });
+                        // 卡片事件 一般较短时间处理 不开新线程
+                        var resp = await InteractiveCallback(sRequestBody, botApp);
+                        return Results.Ok(resp);
+                    }
 
                     // 第一步读数据，此时被加密，进行解密后parse
-                    sRequestBody = EventManager.DecryptData(cConfigFile.Feishu.Encrypt_Key, JsonNode.Parse(sRequestBody)!["encrypt"]!.ToString());
-                    JsonNode nJsonData = JsonNode.Parse(sRequestBody)!;
+                    sRequestBody = EventManager.DecryptData(cConfigFile.Feishu.Encrypt_Key, nJsonData["encrypt"]!.ToString());
+                    nJsonData = JsonNode.Parse(sRequestBody)!;
 
                     // 是否是HTTP测试事件？
                     if (nJsonData["type"] != null)
@@ -91,6 +105,71 @@ namespace HuaTuo
             app.Run("http://localhost:3000");
         }
 
+        public static async Task<object> InteractiveCallback(string sRequestBody, BotApp botApp)
+        {
+            InteractiveEventContent content = JsonSerializer.Deserialize<InteractiveEventContent>(sRequestBody, HttpTools.JsonOption)!;
+            var value = JsonNode.Parse(sRequestBody)!["action"]!["value"];
+            if (value == null) return new { };
+            if (value["action"] == null) return new { };
+            // 刷新或筛选列表
+            if (value["action"]!.ToString() == "refreash")
+            {
+                string? filter = content.Action.Option;
+                if (filter == "all") filter = null;
+                ////////////////此段代码截取自 Command.cs 中 ArchiveCommand 函数，同时更新//////////////////////////
+                var bili_get = BiliAPI.ArchiveList(botApp.biliCredential, filter);
+                var card = new InteractiveContent();
+                var date = DateTime.Now;
+                card.Header("稿件列表", $"上一次刷新：{date:G}", null, "wathet", [InteractiveContent.TextTag("v4.0", "purple")]);
+                card.Config();
+                var list_column_set = new InteractiveContent.ElementsBuilder()
+                    .ColumnSet([
+                        new InteractiveContent.CardColumn() {Width="weighted",Weight=3,Vertical_align="top",Elements=[new {tag="markdown",content="**标题**(封面)",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**BVID**",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**状态**",text_align="center"}]},
+                        ], "grey");
+                var bili_data = await bili_get;
+                foreach (var video in bili_data.Data.Arc_audits)
+                {
+                    list_column_set.ColumnSet([
+                        new InteractiveContent.CardColumn() {Width="weighted",Weight=3,Vertical_align="top",Elements=[new {tag="markdown",content=$"[{video.Archive.Title}]({video.Archive.Cover})",text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content=video.Archive.Bvid,text_align="center"}]},
+                    new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content=$"{video.Archive.State}:{video.Archive.State_desc}",text_align="center"}]},
+                    ]);
+                }
+                list_column_set.ExtraDiv($"全部稿件:{bili_data.Data.Page.Count}  " +
+                                         $"<font color='green'>通过:{bili_data.Data.Class.Pubed}</font>\n" +
+                                         $"<font color='grey'>处理中:{bili_data.Data.Class.Is_pubing}</font>  " +
+                                         $"<font color='red'>未通过:{bili_data.Data.Class.Not_pubed}</font>",
+                                new InteractiveContent.ActionBuilder()
+                                    .SelectStatic("筛选会刷新信息哦~", [
+                                        InteractiveContent.Option("全部稿件", "all"),
+                                    InteractiveContent.Option("通过", "pubed"),
+                                    InteractiveContent.Option("处理中", "is_pubing"),
+                                    InteractiveContent.Option("未通过", "not_pubed")
+                                        ], new { action = "refreash" }, filter).Build()[0], true);
+                card.Elements(list_column_set.Build());
+                //////////////////////////////////////////////////////////////////////////////////////////////////
+                return card.RawData;
+            }
+            return new { };
+        }
+
+        internal record InteractiveEventContent
+        {
+            public required string Open_id { get; set; }
+            public required string Open_message_id { get; set; }
+            public required string Token {  get; set; }
+            public required InteractiveAction Action { get; set; }
+        }
+
+        internal record InteractiveAction
+        {
+            public object? Value { get; set; }
+            public required string Tag { get; set; }
+            public string? Option { get; set; }
+        }
+
         public static T ToDeepCopy<T>(T obj)
         {
             if (obj == null)
@@ -120,7 +199,7 @@ namespace HuaTuo
             public required HuaTuoConfigFileFeishu Feishu { get; set; }
             public required HuaTuoConfigFileConfig Config { get; set; }
             public required HuaTuoConfigFileSetting Setting { get; set; }
-            public required HuaTuoConfigFileGroup[] Group {  get; set; }
+            public required HuaTuoConfigFileGroup[] Group { get; set; }
         }
 
         /// <summary>
@@ -144,7 +223,9 @@ namespace HuaTuo
             public required string BotCalendarID { get; set; }
             public required string CloudSecretID { get; set; }
             public required string CloudSecretKey { get; set; }
-            public required string FeishuID_Ava {  get; set; }
+            public required string BiliUserID { get; set; }
+            public required string BiliSESSData { get; set; }
+            public required string FeishuID_Ava { get; set; }
             public required string FeishuID_Bella { get; set; }
             public required string FeishuID_Diana { get; set; }
             public required string FeishuID_Eileen { get; set; }

@@ -1,6 +1,6 @@
-﻿using RestSharp;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
+using RestSharp;
 
 namespace Feishu.Message
 {
@@ -135,17 +135,250 @@ namespace Feishu.Message
     public sealed class InteractiveContent : IMessageContent
     {
         public string ContentType { get => "interactive"; }
-        public string Content { get { return JsonSerializer.Serialize(_content); } }
+        public string Content { get => JsonSerializer.Serialize(_cards, HttpTools.JsonOption); }
+        public object RawData { get => _cards; }
 
-        private object _content;
+        private readonly Dictionary<string, object> _cards = new Dictionary<string, object>();
 
         public InteractiveContent(string template_id)
         {
-            _content = new { type = "template", data = new { template_id } };
+            _cards.Add("type", "template");
+            _cards.Add("data", new { template_id });
         }
+
         public InteractiveContent(string template_id, object template_variable)
         {
-            _content = new { type = "template", data = new { template_id, template_variable } };
+            _cards.Add("type", "template");
+            _cards.Add("data", new { template_id, template_variable });
+        }
+
+        public InteractiveContent() { }
+
+        public static object TextTag(string tag_text, string color) =>
+            new
+            {
+                tag = "text_tag",
+                text = new { tag = "plain_text", content = tag_text },
+                color,
+            };
+
+        public void Config(bool enable_forward = true, bool update_multi = true)
+        {
+            var obj = new { enable_forward, update_multi };
+            _cards.Add("config", obj);
+        }
+
+        public void Header(string title, string? subtitle = null, string? icon_key = null, string? color = null, object[]? text_tag_list = null)
+        {
+            var obj = new
+            {
+                title = new
+                {
+                    tag = "plain_text",
+                    content = title,
+                },
+                subtitle = subtitle == null ? null : new { tag = "plain_text", content = subtitle },
+                icon = icon_key == null ? null : new { img_key = icon_key },
+                template = color,
+                text_tag_list
+            };
+            _cards.Add("header", obj);
+        }
+
+        public void Elements(object[] elements)
+        {
+            _cards.Add("elements", elements);
+        }
+
+        public record CardColumn
+        {
+            public string Tag { get; } = "column";
+            public object[]? Elements { get; set; } = null;
+            public string? Width { get; set; } = null;
+            public int? Weight { get; set; } = null;
+            public string? Vertical_align { get; set; } = null;
+        }
+
+        public class ElementsBuilder
+        {
+            private readonly List<object> elements = new List<object>();
+            public object[] Build() => elements.ToArray();
+
+            public ElementsBuilder TextDiv(string text, bool lark_md = false)
+            {
+                elements.Add(new
+                {
+                    tag = "div",
+                    text = new
+                    {
+                        tag = lark_md ? "lark_md" : "plain_text",
+                        content = text,
+                    }
+                });
+                return this;
+            }
+
+            public ElementsBuilder MarkdownDiv(string content, string? text_align = null)
+            {
+                elements.Add(new
+                {
+                    tag = "markdown",
+                    content,
+                    text_align
+                });
+                return this;
+            }
+
+            public ElementsBuilder ImageDiv(string image_key, string alt = "", string mode = "stretch")
+            {
+                elements.Add(new
+                {
+                    tag = "img",
+                    img_key = image_key,
+                    mode,
+                    alt = new
+                    {
+                        tag = "plain_text",
+                        content = alt,
+                    },
+                });
+                return this;
+            }
+
+            public ElementsBuilder DividerLine() { elements.Add(new { tag = "hr" }); return this; }
+
+            public ElementsBuilder Actions(object[] actions)
+            {
+                elements.Add(new { tag = "action", actions, layout = "flow" });
+                return this;
+            }
+
+            public ElementsBuilder ColumnSet(CardColumn[] columns, string background_style = "default", string flex_mode = "none", string horizontal_spacing = "default")
+            {
+                elements.Add(new
+                {
+                    tag = "column_set",
+                    columns,
+                    flex_mode,
+                    background_style,
+                    horizontal_spacing,
+                });
+                return this;
+            }
+
+            public ElementsBuilder ExtraDiv(string text, object extra, bool lark_md = false)
+            {
+                elements.Add(new
+                {
+                    tag = "div",
+                    text = new
+                    {
+                        tag = lark_md ? "lark_md" : "plain_text",
+                        content = text,
+                    },
+                    extra
+                });
+                return this;
+            }
+        }
+
+        /// <summary>
+        /// 构造一个确认主体
+        /// </summary>
+        /// <param name="confirm_title">确认窗口标题</param>
+        /// <param name="confirm_text">确认窗口内容</param>
+        /// <returns>object</returns>
+        public static object Confirmer(string confirm_title, string confirm_text) =>
+            new
+            {
+                title = new { tag = "plain_text", content = confirm_title },
+                text = new { tag = "plain_text", content = confirm_text },
+            };
+
+        /// <summary>
+        /// 构造一条选项
+        /// </summary>
+        /// <param name="text">选项展示文本</param>
+        /// <param name="value">回传值</param>
+        /// <returns>object</returns>
+        public static object Option(string text, string value) =>
+            new { text = new { tag = "plain_text", content = text }, value };
+
+        public class ActionBuilder
+        {
+            private readonly List<object> actions = new List<object>();
+            public object[] Build() => actions.ToArray();
+
+            /// <summary>
+            /// 构造一个按钮
+            /// </summary>
+            /// <param name="text">按钮显示文本</param>
+            /// <param name="type">按钮类型</param>
+            /// <param name="value">回传值，按照key=value格式</param>
+            /// <param name="confirmer">确认主体</param>
+            /// <returns></returns>
+            public ActionBuilder Button(string text, string type = "default", object? value = null, object? confirmer = null)
+            {
+                actions.Add(new
+                {
+                    tag = "button",
+                    text = new
+                    {
+                        tag = "plain_text",
+                        content = text,
+                    },
+                    type,
+                    value,
+                    confirm = confirmer,
+                });
+                return this;
+            }
+
+            /// <summary>
+            /// 构造一个折叠按钮组
+            /// </summary>
+            /// <param name="options">按钮组，使用option构造</param>
+            /// <param name="value">回传值，按key=value格式</param>
+            /// <param name="confirmer">确认主体</param>
+            /// <returns></returns>
+            public ActionBuilder Overflow(object[]? options = null, object? value = null, object? confirmer = null)
+            {
+                actions.Add(new
+                {
+                    tag = "overflow",
+                    options,
+                    value,
+                    confirm = confirmer,
+                });
+                return this;
+            }
+
+            /// <summary>
+            /// 构造一个列表选择器
+            /// </summary>
+            /// <param name="descript">提示文本</param>
+            /// <param name="options">选项组，使用option构造</param>
+            /// <param name="value">回传值，按key=value格式</param>
+            /// <param name="initial_option">初始值</param>
+            /// <param name="confirmer">确认主体</param>
+            /// <returns></returns>
+            public ActionBuilder SelectStatic(string descript, object[]? options = null, object? value = null, string? initial_option = null, object? confirmer = null)
+            {
+                actions.Add(new
+                {
+                    tag = "select_static",
+                    placeholder = new
+                    {
+                        tag = "plain_text",
+                        content = descript
+                    },
+                    options,
+                    value,
+                    initial_option,
+                    confirm = confirmer,
+                });
+                return this;
+            }
         }
     }
 

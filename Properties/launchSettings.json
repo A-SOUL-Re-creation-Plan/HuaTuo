@@ -9,7 +9,7 @@
     },
     "HuaTuo": {
       "commandName": "Project",
-      "commandLineArgs": "\"..\\JiHua-NiTuo.toml\" \"..\\Keywords.toml\"",
+      "commandLineArgs": "\"..\\JiHua-HuaTuo.toml\" \"..\\Keywords.toml\"",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

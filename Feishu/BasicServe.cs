@@ -1,4 +1,5 @@
-﻿using Feishu.Calendar;
+﻿using Bilibili;
+using Feishu.Calendar;
 using Feishu.Event;
 using Feishu.Message;
 using Hardware.Info;
@@ -86,9 +87,16 @@ namespace Feishu
     /// </summary>
     public static class HttpTools
     {
+        public class LowerCaseNamingPolicy : JsonNamingPolicy
+        {
+            public override string ConvertName(string name) =>
+                name.ToLower();
+        }
+
         private static readonly JsonSerializerOptions json_option = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            PropertyNamingPolicy = new LowerCaseNamingPolicy(),
             PropertyNameCaseInsensitive = true
         };
 
@@ -102,16 +110,10 @@ namespace Feishu
         /// <exception cref="FeishuException">请求成功，但飞书端抛出错误</exception>
         public static void EnsureSuccessful(RestResponse resp)
         {
-            // 未完成响应
-            if (resp.ResponseStatus != ResponseStatus.Completed)
-            {
-                if (resp.ErrorException != null) throw resp.ErrorException;
-                else throw new HttpRequestException(resp.StatusDescription, null, resp.StatusCode);
-            }
-            else if (!resp.IsSuccessful)
+            if (!resp.IsSuccessful)
             {
                 FeishuErrorResponse errorResponse = JsonSerializer.Deserialize<FeishuErrorResponse>(resp.RawBytes, JsonOption)
-                    ?? throw new HttpRequestException(resp.StatusDescription, null, resp.StatusCode);
+                    ?? throw resp.ErrorException ?? new HttpRequestException(resp.StatusDescription, null, resp.StatusCode);
                 throw new FeishuException(errorResponse);
             }
         }
@@ -168,6 +170,7 @@ namespace Feishu
         // 附加模块
         public readonly ServiceOCR serviceOCR;
         public static readonly MemoryInfos memoryInfo = new MemoryInfos();
+        public readonly BiliCredential biliCredential;
 
         // 功能模块
         public async Task RefreashToken() => await tenant_accessToken.Refreash();
@@ -193,6 +196,7 @@ namespace Feishu
             this.Message = new MessageClient(this, restClient);
             this.Calendar = new CalendarClient(this, restClient, configFile.Config.BotCalendarID);
             this.serviceOCR = new ServiceOCR(configFile.Config.CloudSecretID, configFile.Config.CloudSecretKey);
+            this.biliCredential = new BiliCredential(configFile.Config.BiliUserID, configFile.Config.BiliSESSData);
         }
 
         public string RandomSomething(string[] list)

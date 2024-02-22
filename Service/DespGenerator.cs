@@ -93,7 +93,7 @@
                 if ((live_info & 1) != 0) { desp += item; desp += "\n"; }
                 live_info >>>= 1;
             }
-            return desp;
+            return desp.TrimEnd('\n');
         }
 
         public static string GenerateLiveRoom(byte num)
