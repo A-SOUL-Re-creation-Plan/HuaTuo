@@ -84,14 +84,33 @@ namespace HuaTuo.Service
         [CommandMarker("help", "帮助")]
         public async Task HelpLink(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
-            var help = @"
-                简介生成 -> 简介 {date}
-                日程创建 -> 日程
-                关键词 -> 关键词 {设定/删除} {关键词} {一般/包含}*
-                稿件列表 -> 稿件列表
+            // 真的丑
+            var help = @"简介生成 -> 简介 {date}
+日程创建 -> 日程
+关键词 -> 关键词 {设定/删除} {关键词} {一般/包含}*
+查询关键词列表 -> 关键词
+稿件列表 -> 稿件列表
 
-                每个功能的具体说明请查看机器人主页的帮助文档~";
+每个功能的具体说明请查看机器人主页的帮助文档~";
             await larkGroup.SendMessageAsync(new TextContent(help));
+        }
+
+        [CommandMarker("delete", "撤回")]
+        public async Task DeleteMessage(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            if (cEventContent.Event.Message.Parent_id == null)
+            {
+                await larkGroup.SendMessageAsync(new TextContent("要操作哪条消息呢？"));
+                return;
+            }
+            try
+            {
+                await larkGroup.botApp.Message.DeleteMessage(cEventContent.Event.Message.Parent_id);
+            }
+            catch (FeishuException e)
+            {
+                await larkGroup.SendMessageAsync(new TextContent(e.Message));
+            }
         }
 
         [CommandMarker("简介")]
@@ -266,8 +285,38 @@ namespace HuaTuo.Service
             // 设定/删除
             if (param.Length < 3)
             {
-                await ErrPointOut(param, 1, "是要设定关键词还是删除关键词呢？", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
-                await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerQuestioning)));
+                /*
+                 * v4.0 build 6 更新：若不指定第二参数则查询关键词列表
+                 * await ErrPointOut(param, 1, "是要设定关键词还是删除关键词呢？", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                 * await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(larkGroup.botApp.configFile.Setting.StickerQuestioning)));
+                 * return;
+                */
+                if (KeywordService.Keywords.Count == 0)
+                {
+                    await larkGroup.SendMessageAsync(new TextContent("关键词列表为空"));
+                    await larkGroup.SendMessageAsync(new StickerContent(larkGroup.botApp.RandomSomething(
+                        larkGroup.botApp.configFile.Setting.StickerNonp)));
+                    return;
+                }
+                var text = new TextContent("当前关键词列表（格式：关键词【触发个数】）\n");
+                var dict = new Dictionary<string, int>();
+                foreach (var item in KeywordService.Keywords)
+                {
+                    if(dict.TryGetValue(item.TriggerContent, out var value))
+                    {
+                        dict[item.TriggerContent] = value + 1;
+                    }
+                    else
+                    {
+                        dict.Add(item.TriggerContent, 1);
+                    }
+                }
+                foreach (var item in dict.AsEnumerable())
+                {
+                    text.Add($"{item.Key}【{item.Value}】\n");
+                }
+                text.Text = text.Text.TrimEnd('\n');
+                await larkGroup.SendMessageAsync(text);
                 return;
             }
             var command = param[2] switch
@@ -295,8 +344,10 @@ namespace HuaTuo.Service
             {
                 keyword_type = param[4] switch
                 {
-                    "contains" => "contains",
-                    "包含" => "contains",
+                    "contain" => "contain",
+                    "包含" => "contain",
+                    "regular" => "regular",
+                    "正则" => "regular",
                     _ => "normal"
                 };
             }
