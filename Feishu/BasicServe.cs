@@ -6,6 +6,7 @@ using Hardware.Info;
 using HuaTuo.Service;
 using HuaTuo.Service.EventClass;
 using HuaTuoMain.CloudServe;
+using HuaTuoMain.Service;
 using RestSharp;
 using System.Text.Json;
 
@@ -173,7 +174,7 @@ namespace Feishu
         public readonly BiliCredential biliCredential;
 
         // 功能模块
-        public async Task RefreashToken() => await tenant_accessToken.Refreash();
+        public async Task RefreshToken() => await tenant_accessToken.Refresh();
         public readonly MessageClient Message;
         public readonly CalendarClient Calendar;
 
@@ -222,6 +223,7 @@ namespace Feishu
         public readonly BotApp botApp;
 
         // 附加模块
+        public ArchiveTrackerManager? ARCTracker { get; set; }
 
         // 简易状态机与消息处理
         private GroupStatus status = GroupStatus.Free;

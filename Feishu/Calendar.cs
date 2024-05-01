@@ -30,7 +30,7 @@ namespace Feishu.Calendar
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<CalendarBody.GetEventResponse> GetEvent(string event_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             await token;
@@ -57,7 +57,7 @@ namespace Feishu.Calendar
         public async Task<CalendarBody.GetEventListResponse> GetEventList(string? start_time = null, string? end_time = null,
             int? page_size = null, string? page_token = null, string? sync_token = null, bool ignore_cancelled = true)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
 
             RestRequest request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/");
             if (start_time != null) request.AddQueryParameter("start_time", start_time);
@@ -94,7 +94,7 @@ namespace Feishu.Calendar
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<CalendarBody.GetEventResponse> CreateEvent(CalendarEventEditable calendarEvent)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/");
 
             request.AddBody(calendarEvent);
@@ -118,7 +118,7 @@ namespace Feishu.Calendar
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task DeleteEvent(string event_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             request.AddQueryParameter("need_notification", "false");
@@ -141,7 +141,7 @@ namespace Feishu.Calendar
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<CalendarBody.GetEventResponse> EditEvent(string event_id, CalendarEventEditable calendarEvent)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}");
 
             request.AddBody(calendarEvent);
@@ -157,7 +157,7 @@ namespace Feishu.Calendar
 
         public async Task AddAttendees(string event_id, LarkID[] lark_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees");
 
             List<object> attendees_list = new List<object>();
@@ -197,7 +197,7 @@ namespace Feishu.Calendar
 
         public async Task DeleteAttendeesUser(string event_id, string[] attendee_ids)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees/batch_delete");
 
             request.AddBody(new
@@ -215,7 +215,7 @@ namespace Feishu.Calendar
 
         public async Task<CalendarBody.GetAttendeesResponse> GetAttendeesList(string event_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{this.CalendarId}/events/{event_id}/attendees");
 
             await token;

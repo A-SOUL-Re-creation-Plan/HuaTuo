@@ -116,23 +116,34 @@ namespace HuaTuo.Service
         [CommandMarker("简介")]
         public async Task DespGenerate(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
         {
+            // 1110 默认去除向晚（20240501）
+            byte asoul_all_mem = 0xE;
             // 不包含日期参数，则以当天为日期
             DateTime date = DateTime.Now;
             date = new DateTime(date.Year, date.Month, date.Day);
             // 指令有效性检查
-            if (param.Length > 3)
+            if (param.Length > 6)
             {
-                await ErrPointOut(param, 1, "呜呜呜，接收这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                await ErrPointOut(param, 1, "呜呜呜，塞这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
                 return;
             }
-            if (param.Length == 3)
+            if (param.Length >= 3)
             {
-                if (!DateTime.TryParseExact(param[2], "MM-dd", null, System.Globalization.DateTimeStyles.None, out var parsed))
-                {
-                    await ErrPointOut(param, 2, "呜呜呜，形状太奇怪了", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
-                    return;
-                }
-                date = new DateTime(date.Year, parsed.Month, parsed.Day);
+                for (byte i = 2; i < param.Length; i++)
+                    if (param[i].Equals("member"))
+                    {
+                        asoul_all_mem = Convert.ToByte(param[i+1]);
+                        i++;
+                    }
+                    else if (!DateTime.TryParseExact(param[i], "MM-dd", null, System.Globalization.DateTimeStyles.None, out var parsed))
+                    {
+                        await ErrPointOut(param, i, "呜呜呜，形状太奇怪了", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                        return;
+                    }
+                    else
+                    {
+                        date = new DateTime(date.Year, parsed.Month, parsed.Day);
+                    }
             }
             // 获得日程信息
             var t_start = Timestamp.DateToTimestamp(date);
@@ -156,7 +167,7 @@ namespace HuaTuo.Service
                 text.AddBold("简介\n");
                 if (item.Summary == null) continue;
                 if (item.Description == null || item.Description.Length < 2) item.Description = "标题";
-                text.Add(DespGenerator.GenerateDesp(item.Summary, item.Description, date));
+                text.Add(DespGenerator.GenerateDesp(item.Summary, item.Description, date, asoul_all_mem));
                 await task_manager;
                 task_manager = larkGroup.SendMessageAsync(text);
             }
@@ -279,7 +290,7 @@ namespace HuaTuo.Service
             // 检查指令
             if (param.Length > 5)
             {
-                await ErrPointOut(param, 1, "呜呜呜，接收这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                await ErrPointOut(param, 1, "呜呜呜，塞这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
                 return;
             }
             // 设定/删除
@@ -414,6 +425,41 @@ namespace HuaTuo.Service
             card.Elements(list_column_set.Build());
             //////////////////////////////////////////////////////////////////////////////////
             await larkGroup.SendMessageAsync(card);
+        }
+
+        [CommandMarker("稿件跟踪")]
+        public async Task ARCTrackerCommand(EventContent<MessageReceiveBody> cEventContent, string[] param, LarkGroup larkGroup)
+        {
+            if (param.Length > 4)
+            {
+                await ErrPointOut(param, 1, "呜呜呜，塞这么多参数会坏掉的", cEventContent.Event.Sender.Sender_id.ToLarkID(), larkGroup);
+                return;
+            }
+
+            if (param.Length < 3)
+            {
+                if (larkGroup.ARCTracker == null)
+                {
+                    larkGroup.ARCTracker = new ArchiveTrackerManager(larkGroup);
+                    await larkGroup.ARCTracker.Initialize();
+                    new Thread(() => larkGroup.ARCTracker.MainLoop().Wait()).Start();
+                }
+                await larkGroup.SendMessageAsync(new TextContent("已启用稿件跟踪"));
+                return;
+            }
+
+            if (param[2] == "off")
+            {
+                if (larkGroup.ARCTracker == null)
+                {
+                    await larkGroup.SendMessageAsync(new TextContent("稿件跟踪未在运行哦？！"));
+                    return;
+                }
+                larkGroup.ARCTracker.Stop();
+                larkGroup.ARCTracker = null;
+                await larkGroup.SendMessageAsync(new TextContent("已强制关闭稿件跟踪"));
+                return;
+            }
         }
     }
 

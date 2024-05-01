@@ -177,13 +177,13 @@ namespace Bilibili
             public required DataItem Data { get; set; }
         }
 
-        public class DataItem
+        public record DataItem
         {
             public required ArchiveItem Archive { get; set; }
             public required VideoItem[] Videos { get; set; }
         }
 
-        public class ArchiveItem
+        public record ArchiveItem
         {
             // AV
             public required int Aid { get; set; }
@@ -207,9 +207,13 @@ namespace Bilibili
             public string? Source { get; set; }
             // 粉丝动态
             public required string Dynamic { get; set; }
+            // 发布时间
+            public required string Ptime { get; set; }
+            // 创建时间
+            public required string Ctime { get; set; }
         }
 
-        public class VideoItem
+        public record VideoItem
         {
             // 单P标题
             public required string Title { get; set; }
@@ -225,21 +229,33 @@ namespace Bilibili
     public static class BiliArchiveListResponse
     {
 
-        public class Rootobject
+        public record Rootobject
         {
             public required int Code { get; set; }
             public required string Message { get; set; }
             public required Data Data { get; set; }
         }
 
-        public class Data
+        public record Data
         {
             public required ClassItem Class { get; set; }
             public required Arc_Audits[] Arc_audits { get; set; }
             public required Page Page { get; set; }
+
+            public Arc_Audits? Search(string bvid)
+            {
+                foreach (var item in Arc_audits)
+                {
+                    if (item.Archive.Bvid == bvid)
+                    {
+                        return item;
+                    }
+                }
+                return null;
+            }
         }
 
-        public class ClassItem
+        public record ClassItem
         {
             // 已通过
             public int Pubed { get; set; }
@@ -249,7 +265,7 @@ namespace Bilibili
             public int Is_pubing { get; set; }
         }
 
-        public class Page
+        public record Page
         {
             // 第N页
             public required int Pn { get; set; }
@@ -259,7 +275,7 @@ namespace Bilibili
             public required int Count { get; set; }
         }
 
-        public class Arc_Audits
+        public record Arc_Audits
         {
             public required BiliVideoMemberResponse.ArchiveItem Archive { get; set; }
         }
@@ -267,20 +283,20 @@ namespace Bilibili
 
     public static class BiliRejectReasonResponse
     {
-        public class Rootobject
+        public record Rootobject
         {
             public required int Code { get; set; }
             public required string Message { get; set; }
             public required Data Data { get; set; }
         }
 
-        public class Data
+        public record Data
         {
             public required int Aid { get; set; }
             public required Video[] Videos { get; set; }
         }
 
-        public class Video
+        public record Video
         {
             public required int Index_order { get; set; }
             public required string Xcode_fail_msg { get; set; }

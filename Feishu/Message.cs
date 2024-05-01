@@ -411,7 +411,7 @@ namespace Feishu.Message
         public async Task<Response.MessageSendResponse> SendMessageAsync(IMessageContent content, LarkID receive_id, string? uuid = null)
         {
             // 获取Token
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             // 构建请求体
             var request = new RestRequest(_base_uri);
             request.AddQueryParameter("receive_id_type", receive_id.id_type);
@@ -444,7 +444,7 @@ namespace Feishu.Message
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageGetResponse> GetMessageAsync(string message_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             await token;
@@ -468,7 +468,7 @@ namespace Feishu.Message
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageSendResponse> ReplyMessageAsync(IMessageContent content, string message_id, string? uuid = null)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}/reply");
 
             request.AddBody(new
@@ -496,7 +496,7 @@ namespace Feishu.Message
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task DeleteMessage(string message_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             await token;
@@ -517,7 +517,7 @@ namespace Feishu.Message
         /// <exception cref="HttpRequestException">Http请求时抛出错误</exception>
         public async Task<Response.MessageSendResponse> EditMessage(IMessageContent content, string message_id)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}");
 
             request.AddBody(new
@@ -544,7 +544,7 @@ namespace Feishu.Message
         /// <exception cref="Exception">发错错误</exception>
         public async Task<byte[]> DownloadFromMessage(string message_id, string file_key)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var stream_type = file_key.StartsWith("img") ? "image" : "file";
             var request = new RestRequest($"{_base_uri.OriginalString}{message_id}/resources/{file_key}?type={stream_type}");
             await token;
@@ -562,7 +562,7 @@ namespace Feishu.Message
         /// <exception cref="Exception">发生错误时</exception>
         public async Task<string> UploadImage(Stream img_stream)
         {
-            var token = app.RefreashToken();
+            var token = app.RefreshToken();
             var client = new RestClient("https://open.feishu.cn/open-apis/im/v1/images");
             client.AddDefaultHeader("Content-Type", "multipart/form-data");
             client.AddDefaultParameter("image_type", "message");

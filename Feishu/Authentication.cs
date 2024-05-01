@@ -31,7 +31,7 @@ namespace Feishu.Authentication
             _httpClient.AddDefaultHeader("Content-Type", "application/json");
         }
 
-        public async Task Refreash()
+        public async Task Refresh()
         {
             // 调用此函数刷新Token
             if (Timestamp.GetTimestamp() - _expires_at > -100)

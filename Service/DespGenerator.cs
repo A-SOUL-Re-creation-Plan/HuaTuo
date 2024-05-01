@@ -62,7 +62,7 @@
         /// </summary>
         /// <param name="summary">日程主题</param>
         /// <returns>byte</returns>
-        public static byte ParseLiveMember(string summary)
+        public static byte ParseLiveMember(string summary, byte all_mem = 0xF)
         {
             byte mem = 0;
             if (summary.Contains("夜谈")) mem |= 0x1;
@@ -73,21 +73,20 @@
             if (summary.Contains("贝拉")) mem |= 0x2;
             if (summary.Contains("嘉然")) mem |= 0x4;
             if (summary.Contains("乃琳")) mem |= 0x8;
-            return mem != 0 ? mem : (byte)0xF;
+            return (mem & 0xF) != 0 ? mem : all_mem;
             //return ASOUL_MemberList((byte)(mem & 0xF)) + ASOUL_MemberList((byte)(mem | 0xF));
         }
 
-        public static string GenerateDesp(string summary, string title, DateTime date)
+        public static string GenerateDesp(string summary, string title, DateTime date, byte all_mem = 0xF)
         {
             string desp = "";
             // 1.拼接时间信息
             desp += $"直播日期：{date.Year}年{date.Month}月{date.Day}日\n";
             // 2.拼接直播信息
-            byte live_info = ParseLiveMember(summary);
+            byte live_info = ParseLiveMember(summary, all_mem);
             desp += ASOUL_InfoList(live_info) + $"【{title.Replace("\n", "")}】\n";
             desp += "--------------------------------------------------------";
             // 3.拼接成员信息
-            if ((live_info >> 4) != 0) live_info |= 0xF;
             foreach (string item in LiveDespInfoList)
             {
                 if ((live_info & 1) != 0) { desp += item; desp += "\n"; }
