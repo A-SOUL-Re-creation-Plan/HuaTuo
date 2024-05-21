@@ -88,8 +88,7 @@ namespace Bilibili
             var resp = await client.ExecuteAsync(request, Method.Get);
             if (resp.IsSuccessful)
             {
-                return JsonSerializer.Deserialize<BiliArchiveListResponse.Rootobject>(resp.RawBytes, HttpTools.JsonOption) ??
-                    throw new Exception("Deserialize Failed");
+                return JsonSerializer.Deserialize<BiliArchiveListResponse.Rootobject>(resp.RawBytes, HttpTools.DeserializeOption)!;
             }
             else throw resp.ErrorException ?? new Exception("Http Failed");
         }
@@ -208,9 +207,9 @@ namespace Bilibili
             // 粉丝动态
             public required string Dynamic { get; set; }
             // 发布时间
-            public required string Ptime { get; set; }
+            public required long Ptime { get; set; }
             // 创建时间
-            public required string Ctime { get; set; }
+            public required long Ctime { get; set; }
         }
 
         public record VideoItem

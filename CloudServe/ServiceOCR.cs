@@ -99,8 +99,10 @@ namespace HuaTuoMain.CloudServe
                     continue;
                 if (DateTime.TryParseExact(detection.DetectedText, "MM.dd", null, System.Globalization.DateTimeStyles.None, out var date))
                     return new DateTime(DateTime.Now.Year, date.Month, date.Day);
+                if (DateTime.TryParseExact(detection.DetectedText, "M.d", null, System.Globalization.DateTimeStyles.None, out var sdate))
+                    return new DateTime(DateTime.Now.Year, date.Month, sdate.Day);
             }
-            throw new Exception("Not Found");
+            throw new Exception("无法找到日程表时基");
         }
 
         public static BasicSchedule.ModelPredictedBox[] DetectionsRanging(this BasicSchedule.ModelPredictedBox box, 

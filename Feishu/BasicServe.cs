@@ -101,7 +101,14 @@ namespace Feishu
             PropertyNameCaseInsensitive = true
         };
 
+        private static readonly JsonSerializerOptions deserialize_option = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            PropertyNameCaseInsensitive = true
+        };
+
         public static JsonSerializerOptions JsonOption { get => json_option; }
+        public static JsonSerializerOptions DeserializeOption { get => deserialize_option; }
 
         /// <summary>
         /// 确认正常响应，尝试提取信息

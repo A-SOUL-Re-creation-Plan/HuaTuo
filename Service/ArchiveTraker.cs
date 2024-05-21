@@ -26,9 +26,9 @@ namespace HuaTuoMain.Service
         // 粉丝动态
         public required string Dynamic { get; set; }
         // 发布时间
-        public required string Ptime { get; set; }
+        public required long Ptime { get; set; }
         // 创建时间
-        public required string Ctime { get; set; }
+        public required long Ctime { get; set; }
 
         public ArchiveTrackInfo Copy()
         {

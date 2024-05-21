@@ -402,7 +402,18 @@ namespace HuaTuo.Service
                     new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**BVID**",text_align="center"}]},
                     new InteractiveContent.CardColumn() {Width="weighted",Weight=1,Vertical_align="top",Elements=[new {tag="markdown",content="**状态**",text_align="center"}]},
                     ], "grey");
-            var bili_data = await bili_get;
+            BiliArchiveListResponse.Rootobject bili_data;
+            try
+            {
+                bili_data = await bili_get;
+            }
+            catch (Exception e)
+            {
+                var err_report = new TextContent("查询时发生错误\n");
+                err_report.Text += e.Message;
+                await larkGroup.SendMessageAsync(err_report);
+                return;
+            }
             foreach (var video in bili_data.Data.Arc_audits)
             {
                 list_column_set.ColumnSet([
