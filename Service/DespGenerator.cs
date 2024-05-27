@@ -73,7 +73,7 @@
             if (summary.Contains("贝拉")) mem |= 0x2;
             if (summary.Contains("嘉然")) mem |= 0x4;
             if (summary.Contains("乃琳")) mem |= 0x8;
-            return (mem & 0xF) != 0 ? mem : all_mem;
+            return (mem & 0xF) != 0 ? mem : (byte)(all_mem | mem);
             //return ASOUL_MemberList((byte)(mem & 0xF)) + ASOUL_MemberList((byte)(mem | 0xF));
         }
 
