@@ -253,7 +253,7 @@ namespace HuaTuo.Service
 
             // 运行模型
             BotApp.memoryInfo.Refreash();
-            if (BotApp.memoryInfo.Avalible <= 1.0f)
+            if (BotApp.memoryInfo.Avalible <= 0.8f)
             {
                 await larkGroup.SendMessageAsync(new TextContent(
                     $"<b>警告：可用内存过低({BotApp.memoryInfo.Avalible:0.0}GB)，运行模型可能失败</b>\n创建日程期间请尽量不调用机器人以防内存溢出"));
@@ -280,8 +280,10 @@ namespace HuaTuo.Service
                     err_msg.Add(e.Message + "\n");
                     err_msg.Add($"在Task：{task}");
                     await larkGroup.SendMessageAsync(err_msg);
+                    return;
                 }
             }
+            await larkGroup.SendMessageAsync(new TextContent("Tip：请手动拉取日程参与人"));
         }
 
         [CommandMarker("关键词")]

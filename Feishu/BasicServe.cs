@@ -174,6 +174,7 @@ namespace Feishu
         public readonly HuaTuo.Program.HuaTuoConfigFile configFile;
         public readonly ILogger Logger;
         public string Token { get => tenant_accessToken.Token; }
+        public string AppAccess { get => tenant_accessToken.AppAccess; }
 
         // 附加模块
         public readonly ServiceOCR serviceOCR;
@@ -191,7 +192,7 @@ namespace Feishu
         public void TryGetGroupInstance(LarkID chat_id, out LarkGroup? group) => this.Groups.TryGetValue(chat_id.id, out group);
 
         // 公用HTTP池
-        private readonly RestClient restClient;
+        public readonly RestClient restClient;
         private readonly Authentication.TenantAccessToken tenant_accessToken;
 
         public BotApp(HuaTuo.Program.HuaTuoConfigFile cfg_file, ILogger logger)

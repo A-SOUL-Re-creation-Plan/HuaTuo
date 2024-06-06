@@ -215,7 +215,12 @@ namespace HuaTuo.Service
                     if ((parsed >>> 4) != 0)
                     {
                         // 团播 不做修改
-                        attendees.Add(new LarkID(FeishuIDs[5]));
+                        // 团播：计画，糖贝琳
+                        // attendees.Add(new LarkID(FeishuIDs[5]));
+                        attendees.Add(new LarkID(FeishuIDs[1]));
+                        attendees.Add(new LarkID(FeishuIDs[2]));
+                        attendees.Add(new LarkID(FeishuIDs[3]));
+                        attendees.Add(new LarkID(FeishuIDs[4]));
                         break;
                     }
                     if (parsed != 0x1 && parsed != 0x2 && parsed != 0x4 && parsed != 0x8)

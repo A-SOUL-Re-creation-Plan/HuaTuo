@@ -5,18 +5,20 @@ namespace Feishu.Authentication
     public class TenantAccessToken
     {
         // 请求地址
-        private static readonly Uri _token_url = new("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal");
+        private static readonly Uri _token_url = new("https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal");
         // 请求体，本质用于存储app_id和app_secret
         private readonly RestRequest _request_body;
         // RestClient实例
         private readonly RestClient _httpClient;
         // 存储Token
         private string _token = "";
+        private string _app_access = "";
         // 记录Token可用性
         private long _expires_at = 0;
 
         // 对外Token属性
         public string Token { get => _token; }
+        public string AppAccess { get => _app_access; }
 
 
         public TenantAccessToken(string app_id, string app_secret, RestClient client)
@@ -40,6 +42,7 @@ namespace Feishu.Authentication
                 HttpTools.EnsureSuccessful(resp);
                 _token = resp.Data!.Tenant_access_token;
                 _expires_at = Timestamp.GetTimestamp() + resp.Data!.Expire;
+                _app_access = resp.Data!.App_access_token;
             }
         }
     }
@@ -55,6 +58,7 @@ namespace Feishu.Authentication
         int Code = 0,
         string Msg = "",
         string Tenant_access_token = "",
-        int Expire = 0
+        int Expire = 0,
+        string App_access_token = ""
     );
 }
